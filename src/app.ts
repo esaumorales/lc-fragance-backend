@@ -1,5 +1,6 @@
 import express from "express";
 import { adminRouter } from "@/routes/admin.route";
+import { adminUserRouter } from "@/routes/admin-user.route";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -42,6 +43,7 @@ export function createApp() {
   // API
   app.use("/api", healthRouter);
   app.use("/api", adminRouter);
+  app.use("/api", adminUserRouter);
   app.use("/api", categoryRouter);
   app.use("/api", productRouter);
   app.use("/api", authRouter);

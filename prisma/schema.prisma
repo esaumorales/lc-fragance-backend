@@ -10,6 +10,14 @@ datasource db {
 enum Role {
   CUSTOMER
   ADMIN
+  // El dueño: es el unico que da de alta y de baja administradores.
+  SUPERADMIN
+}
+
+// Para que sirve un enlace de un solo uso enviado por correo.
+enum LinkPurpose {
+  INVITE
+  RESET
 }
 
 enum OrderStatus {
@@ -26,12 +34,45 @@ model User {
   password  String
   name      String
   role      Role     @default(CUSTOMER)
+  // Suspender conserva el historial; eliminar lo borra. Un suspendido no entra.
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  refreshTokens RefreshToken[]
-  cart          Cart?
-  orders        Order[]
+  refreshTokens     RefreshToken[]
+  cart              Cart?
+  orders            Order[]
+  verificationCodes VerificationCode[]
+  accessLinks       AccessLink[]
+}
+
+// Segundo factor: el codigo que llega al correo al iniciar sesion como admin.
+model VerificationCode {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Se guarda el hash, igual que los refresh: si se filtra la tabla no sirve.
+  codeHash  String
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Enlace de un solo uso para poner contraseña: invitacion o restablecimiento.
+model AccessLink {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String      @unique
+  purpose   LinkPurpose
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime    @default(now())
+
+  @@index([userId])
 }
 
 model RefreshToken {

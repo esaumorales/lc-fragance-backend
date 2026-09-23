@@ -16,6 +16,9 @@ const authLimiter = rateLimit({
 
 authRouter.post("/auth/register", authLimiter, asyncHandler(authController.register));
 authRouter.post("/auth/login", authLimiter, asyncHandler(authController.login));
+authRouter.post("/auth/codigo", authLimiter, asyncHandler(authController.verificarCodigo));
+authRouter.post("/auth/olvide", authLimiter, asyncHandler(authController.olvide));
+authRouter.post("/auth/restablecer", authLimiter, asyncHandler(authController.restablecer));
 authRouter.post("/auth/refresh", asyncHandler(authController.refresh));
 authRouter.post("/auth/logout", asyncHandler(authController.logout));
 authRouter.get("/auth/me", requireAuth, asyncHandler(authController.me));

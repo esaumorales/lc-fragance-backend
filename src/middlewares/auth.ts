@@ -24,9 +24,21 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   }
 }
 
-export function requireRole(...roles: AccessTokenPayload["role"][]) {
+type Rol = AccessTokenPayload["role"];
+
+// El superadministrador puede todo lo que puede un admin: sin esto habria que
+// enumerar los dos roles en cada ruta, y basta olvidarlo en una para dejar al
+// dueño afuera de su propio panel.
+export function tieneAcceso(rol: Rol, permitidos: Rol[]): boolean {
+  if (permitidos.includes(rol)) {
+    return true;
+  }
+  return rol === "SUPERADMIN" && permitidos.includes("ADMIN");
+}
+
+export function requireRole(...roles: Rol[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !tieneAcceso(req.user.role, roles)) {
       return next(new ApiError(403, "Forbidden"));
     }
     next();

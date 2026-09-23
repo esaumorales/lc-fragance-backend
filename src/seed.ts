@@ -9,12 +9,14 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: admin.email },
-    update: {},
+    // Se le asegura el rol tambien si ya existia: es la cuenta del dueño y
+    // sin SUPERADMIN activo nadie puede dar de alta administradores.
+    update: { role: "SUPERADMIN", isActive: true },
     create: {
       name: "Admin LC Fragance",
       email: admin.email,
       password: await argon2.hash(admin.password),
-      role: "ADMIN",
+      role: "SUPERADMIN",
     },
   });
 

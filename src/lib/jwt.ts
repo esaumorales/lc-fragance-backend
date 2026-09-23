@@ -1,10 +1,11 @@
+import type { Role } from "@prisma/client";
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { randomUUID } from "crypto";
 import { env } from "@/config/env";
 
 export type AccessTokenPayload = {
   sub: string; // userId
-  role: "CUSTOMER" | "ADMIN";
+  role: Role;
 };
 
 // El tiempo de expiracion llega del entorno como string ("15m", "7d"), pero

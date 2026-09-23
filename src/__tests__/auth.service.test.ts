@@ -12,6 +12,7 @@ const baseUser = {
   name: "Ana",
   email: "ana@example.com",
   role: "CUSTOMER" as const,
+  isActive: true,
 };
 
 describe("authService.register", () => {
@@ -83,7 +84,24 @@ describe("authService.login", () => {
 
     const result = await authService.login({ email: baseUser.email, password: "correcta" });
 
+    // Un cliente entra derecho: el segundo factor es solo para el panel.
+    if ("requiereCodigo" in result) {
+      throw new Error("un CUSTOMER no deberia pasar por el segundo factor");
+    }
     expect(result.user.id).toBe(baseUser.id);
     expect(result.accessToken).toEqual(expect.any(String));
+  });
+
+  it("rechaza con 403 si la cuenta está suspendida", async () => {
+    const passwordHash = await argon2.hash("correcta");
+    vi.spyOn(authRepository, "findUserByEmail").mockResolvedValue({
+      ...baseUser,
+      isActive: false,
+      password: passwordHash,
+    } as never);
+
+    await expect(
+      authService.login({ email: baseUser.email, password: "correcta" })
+    ).rejects.toMatchObject({ status: 403 });
   });
 });

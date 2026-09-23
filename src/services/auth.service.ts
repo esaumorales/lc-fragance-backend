@@ -1,13 +1,36 @@
 import argon2 from "argon2";
+import { randomBytes } from "crypto";
+import type { Role } from "@prisma/client";
 import { authRepository } from "@/repositories/auth.repository";
-import type { LoginInput, RegisterInput } from "@/schemas/auth.schema";
+import type {
+  LoginInput,
+  RegisterInput,
+  RestablecerInput,
+  VerificarCodigoInput,
+} from "@/schemas/auth.schema";
 import { ApiError } from "@/middlewares/error-handler";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/lib/jwt";
 import { sha256Hex } from "@/lib/hash";
 import { parseDurationMs } from "@/lib/duration";
 import { env } from "@/config/env";
+import {
+  MINUTOS_DE_VIGENCIA,
+  generarCodigo,
+  hashearCodigo,
+  vencimientoDelCodigo,
+  verificarCodigo,
+} from "@/lib/codigo-verificacion";
+import { emailService, plantillas } from "@/services/email.service";
 
-type AuthUser = { id: string; name: string; email: string; role: "CUSTOMER" | "ADMIN" };
+type AuthUser = { id: string; name: string; email: string; role: Role };
+
+export const HORAS_DEL_ENLACE = 24;
+
+// Los roles con acceso al panel piden el codigo por correo; un cliente que solo
+// compra no tiene por que pasar por eso.
+function necesitaSegundoFactor(role: Role): boolean {
+  return role === "ADMIN" || role === "SUPERADMIN";
+}
 
 async function issueTokens(user: AuthUser) {
   const accessToken = signAccessToken({ sub: user.id, role: user.role });
@@ -19,8 +42,23 @@ async function issueTokens(user: AuthUser) {
   return { accessToken, refreshToken };
 }
 
-function toAuthUser(user: { id: string; name: string; email: string; role: "CUSTOMER" | "ADMIN" }): AuthUser {
+function toAuthUser(user: { id: string; name: string; email: string; role: Role }): AuthUser {
   return { id: user.id, name: user.name, email: user.email, role: user.role };
+}
+
+function vencimientoDelEnlace(): Date {
+  return new Date(Date.now() + HORAS_DEL_ENLACE * 60 * 60 * 1000);
+}
+
+// El token viaja en la URL y de el solo se guarda el hash, como los refresh.
+export function generarTokenDeEnlace(): { token: string; tokenHash: string } {
+  const token = randomBytes(32).toString("hex");
+  return { token, tokenHash: sha256Hex(token) };
+}
+
+export function armarUrlDeEnlace(token: string, ruta: "invitacion" | "restablecer"): string {
+  const base = env.clientUrls[0] ?? "http://localhost:3000";
+  return `${base}/${ruta}?token=${token}`;
 }
 
 export const authService = {
@@ -48,8 +86,105 @@ export const authService = {
       throw new ApiError(401, "Credenciales inválidas");
     }
 
+    // Se comprueba despues de la contraseña: antes, el mensaje le revelaria a
+    // cualquiera que prueba correos cuales existen.
+    if (!user.isActive) {
+      throw new ApiError(403, "La cuenta está suspendida");
+    }
+
+    if (necesitaSegundoFactor(user.role)) {
+      const codigo = generarCodigo();
+      const desafio = await authRepository.createVerificationCode(
+        user.id,
+        hashearCodigo(codigo),
+        vencimientoDelCodigo()
+      );
+
+      const envio = await emailService.enviar({
+        para: user.email,
+        asunto: `Tu código de acceso: ${codigo}`,
+        html: plantillas.codigoDeAcceso(user.name, codigo, MINUTOS_DE_VIGENCIA),
+      });
+
+      return {
+        requiereCodigo: true as const,
+        desafioId: desafio.id,
+        correoEnviado: envio.enviado,
+      };
+    }
+
     const tokens = await issueTokens(toAuthUser(user));
     return { ...tokens, user: toAuthUser(user) };
+  },
+
+  async verificarSegundoFactor(data: VerificarCodigoInput) {
+    const desafio = await authRepository.findVerificationCode(data.desafioId);
+    if (!desafio) {
+      throw new ApiError(401, "Código inválido");
+    }
+
+    const resultado = verificarCodigo(desafio, data.codigo);
+    if (!resultado.valido) {
+      // Solo suma intento el codigo equivocado: los demas rechazos ya son
+      // definitivos y contarlos no cambia nada.
+      if (resultado.motivo === "incorrecto") {
+        await authRepository.registerFailedAttempt(desafio.id);
+      }
+      const mensajes = {
+        usado: "Ese código ya se usó",
+        vencido: "El código venció, pedí uno nuevo",
+        "sin-intentos": "Demasiados intentos, pedí un código nuevo",
+        incorrecto: "Código inválido",
+      };
+      throw new ApiError(401, mensajes[resultado.motivo]);
+    }
+
+    await authRepository.markCodeUsed(desafio.id);
+
+    if (!desafio.user.isActive) {
+      throw new ApiError(403, "La cuenta está suspendida");
+    }
+
+    const tokens = await issueTokens(toAuthUser(desafio.user));
+    return { ...tokens, user: toAuthUser(desafio.user) };
+  },
+
+  // Responde lo mismo exista o no la cuenta: si no, sirve para averiguar que
+  // correos estan registrados.
+  async olvideContrasena(email: string) {
+    const user = await authRepository.findUserByEmail(email);
+    if (!user || !user.isActive) {
+      return { enviado: false };
+    }
+
+    const { token, tokenHash } = generarTokenDeEnlace();
+    await authRepository.createAccessLink(user.id, tokenHash, "RESET", vencimientoDelEnlace());
+
+    const envio = await emailService.enviar({
+      para: user.email,
+      asunto: "Restablecer tu contraseña",
+      html: plantillas.restablecer(
+        user.name,
+        armarUrlDeEnlace(token, "restablecer"),
+        HORAS_DEL_ENLACE
+      ),
+    });
+
+    return { enviado: envio.enviado };
+  },
+
+  async restablecerContrasena(data: RestablecerInput) {
+    const enlace = await authRepository.findAccessLink(sha256Hex(data.token));
+    if (!enlace || enlace.usedAt || enlace.expiresAt <= new Date()) {
+      throw new ApiError(400, "El enlace no es válido o ya venció");
+    }
+
+    await authRepository.updatePassword(enlace.userId, await argon2.hash(data.password));
+    await authRepository.markLinkUsed(enlace.id);
+    // Cambiar la clave cierra las sesiones abiertas con la anterior.
+    await authRepository.revokeAllRefreshTokens(enlace.userId);
+
+    return { email: enlace.user.email };
   },
 
   async refresh(refreshToken: string) {
@@ -70,6 +205,9 @@ export const authService = {
     const user = await authRepository.findUserById(payload.sub);
     if (!user) {
       throw new ApiError(401, "Usuario no encontrado");
+    }
+    if (!user.isActive) {
+      throw new ApiError(403, "La cuenta está suspendida");
     }
 
     // Rotación: se revoca el token usado y se emite uno nuevo.
