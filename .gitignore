@@ -5,7 +5,8 @@ dist/
 # Entorno: nunca se versiona, hay secretos adentro
 .env
 .env.*
-!.env.example
+# Las plantillas sin secretos si van: deploy/.env.example
+!.env*.example
 
 *.log
 .DS_Store
