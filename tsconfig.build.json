@@ -1,0 +1,6 @@
+{
+  // El typecheck usa tsconfig.json y revisa todo, pruebas incluidas.
+  // Esta variante es solo para compilar: deja las pruebas fuera de la imagen.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "dist", "src/__tests__"]
+}

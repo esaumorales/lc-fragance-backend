@@ -1,23 +1,29 @@
 import { PrismaClient } from "@prisma/client";
 import argon2 from "argon2";
+import { resolverAdminInicial } from "@/lib/admin-inicial";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@lyoncall.com";
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "LyonCallAdmin123";
+  const admin = resolverAdminInicial(process.env);
 
   await prisma.user.upsert({
-    where: { email: adminEmail },
+    where: { email: admin.email },
     update: {},
     create: {
-      name: "Admin Lyon Call",
-      email: adminEmail,
-      password: await argon2.hash(adminPassword),
+      name: "Admin LC Fragance",
+      email: admin.email,
+      password: await argon2.hash(admin.password),
       role: "ADMIN",
     },
   });
-  console.log(`Admin listo: ${adminEmail} / ${adminPassword} (cambiar en producción)`);
+
+  // La clave real no se imprime: el stdout del contenedor queda en los logs.
+  console.log(
+    admin.esDeDesarrollo
+      ? `Admin listo: ${admin.email} / ${admin.password} (clave de desarrollo)`
+      : `Admin listo: ${admin.email} (clave tomada de ADMIN_PASSWORD)`
+  );
 
   const perfumes = await prisma.category.upsert({
     where: { slug: "perfumes" },

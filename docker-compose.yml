@@ -1,3 +1,13 @@
+# Solo la base de datos para desarrollo. El backend corre fuera, con "pnpm dev",
+# que recarga al guardar; el Dockerfile de al lado es el de produccion.
+#
+# La pila de produccion completa esta en deploy/docker-compose.prod.yml.
+
+# Nombre fijo: si se deduce de la carpeta ("backend") choca con cualquier otro
+# proyecto que tambien viva en una carpeta asi y compartirian contenedores.
+# Es "fragance" para seguir usando el volumen que ya tiene los datos locales.
+name: fragance
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -7,6 +17,7 @@ services:
       POSTGRES_USER: fragance
       POSTGRES_PASSWORD: fragance_dev_password
       POSTGRES_DB: fragance
+    # 5434 en el host para no chocar con un Postgres ya instalado.
     ports:
       - "5434:5432"
     volumes:
@@ -22,27 +33,12 @@ services:
     container_name: fragance-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@lyoncall.com
+      PGADMIN_DEFAULT_EMAIL: admin@lcfragance.com
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5050:80"
     depends_on:
       - postgres
-
-  backend:
-    build:
-      context: ./backend
-    container_name: fragance-backend
-    restart: unless-stopped
-    env_file:
-      - ./backend/.env
-    environment:
-      DATABASE_URL: postgresql://fragance:fragance_dev_password@postgres:5432/fragance?schema=public
-    ports:
-      - "4001:4001"
-    depends_on:
-      postgres:
-        condition: service_healthy
 
 volumes:
   fragance_postgres_data:
