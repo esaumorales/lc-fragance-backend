@@ -14,6 +14,7 @@ import { cartRouter } from "@/routes/cart.route";
 import { checkoutRouter } from "@/routes/checkout.route";
 import { uploadRouter } from "@/routes/upload.route";
 import { generateOpenApiDocument } from "@/docs/openapi";
+import { comprobadorDeOrigen } from "@/lib/cors-origen";
 import { errorHandler, notFoundHandler } from "@/middlewares/error-handler";
 
 export function createApp() {
@@ -31,7 +32,7 @@ export function createApp() {
       },
     })
   );
-  app.use(cors({ origin: env.clientUrl, credentials: true }));
+  app.use(cors({ origin: comprobadorDeOrigen(env.clientUrls), credentials: true }));
   app.use(express.json());
   app.use(cookieParser());
   if (env.nodeEnv !== "test") {

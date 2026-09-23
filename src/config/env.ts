@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { parsearOrigenes } from "@/lib/cors-origen";
 
 function required(name: string, fallback?: string): string {
   const value = process.env[name] ?? fallback;
@@ -11,7 +12,9 @@ function required(name: string, fallback?: string): string {
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
-  clientUrl: required("CLIENT_URL", "http://localhost:3000"),
+  // CLIENT_URL admite varios origenes separados por coma: produccion, las
+  // vistas previas de Vercel y el localhost de desarrollo.
+  clientUrls: parsearOrigenes(required("CLIENT_URL", "http://localhost:3000")),
 
   databaseUrl: required("DATABASE_URL"),
 

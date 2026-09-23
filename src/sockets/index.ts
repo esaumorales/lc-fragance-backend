@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from "http";
 import { Server } from "socket.io";
 import { env } from "@/config/env";
+import { comprobadorDeOrigen } from "@/lib/cors-origen";
 
 // Canales:
 // - "stock:updated"   { productId, stock }         -> el catálogo actualiza en vivo
@@ -8,7 +9,7 @@ import { env } from "@/config/env";
 // - "admin:newOrder"  { orderId }                   -> dashboard admin
 export function createSocketServer(httpServer: HttpServer) {
   const io = new Server(httpServer, {
-    cors: { origin: env.clientUrl, credentials: true },
+    cors: { origin: comprobadorDeOrigen(env.clientUrls), credentials: true },
   });
 
   io.on("connection", (socket) => {
