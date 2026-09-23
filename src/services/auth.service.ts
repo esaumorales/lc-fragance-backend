@@ -106,6 +106,16 @@ export const authService = {
         html: plantillas.codigoDeAcceso(user.name, codigo, MINUTOS_DE_VIGENCIA),
       });
 
+      // Sin correo configurado nadie podria entrar al panel nunca mas. El
+      // codigo queda en el log del servidor, al que solo llega quien ya tiene
+      // acceso a la maquina. En cuanto el correo funcione, deja de escribirse.
+      if (!envio.enviado) {
+        console.warn(
+          `[segundo factor] no se pudo enviar el correo (${envio.motivo}). ` +
+            `Código para ${user.email}: ${codigo}`
+        );
+      }
+
       return {
         requiereCodigo: true as const,
         desafioId: desafio.id,

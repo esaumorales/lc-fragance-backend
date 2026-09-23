@@ -63,10 +63,32 @@ describe("login de un administrador", () => {
       enviado: false,
       motivo: "Falta RESEND_API_KEY en el servidor",
     });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const resultado = await authService.login({ email: admin.email, password: "correcta" });
 
     expect(resultado).toMatchObject({ requiereCodigo: true, correoEnviado: false });
+  });
+
+  it("si el correo falla, deja el código en el log para no quedar encerrado", async () => {
+    await prepararLogin();
+    vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: false, motivo: "sin clave" });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await authService.login({ email: admin.email, password: "correcta" });
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(admin.email));
+    expect(warn.mock.calls[0]![0]).toMatch(/\d{6}/);
+  });
+
+  it("con el correo enviado, el código no aparece en ningún log", async () => {
+    await prepararLogin();
+    vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: true });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await authService.login({ email: admin.email, password: "correcta" });
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 
