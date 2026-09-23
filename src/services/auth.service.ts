@@ -180,6 +180,12 @@ export const authService = {
       ),
     });
 
+    // Quien lo pide recibe siempre la misma respuesta, asi que un fallo de
+    // envio seria invisible: queda anotado, sin el enlace, que es lo secreto.
+    if (!envio.enviado) {
+      console.warn(`[restablecer] no se pudo enviar el correo a ${user.email}: ${envio.motivo}`);
+    }
+
     return { enviado: envio.enviado };
   },
 

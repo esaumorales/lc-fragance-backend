@@ -165,3 +165,40 @@ describe("authService.verificarSegundoFactor", () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 });
+
+describe("authService.olvideContrasena", () => {
+  it("anota el fallo de envío, que si no quedaría invisible", async () => {
+    vi.spyOn(authRepository, "findUserByEmail").mockResolvedValue({ ...admin } as never);
+    vi.spyOn(authRepository, "createAccessLink").mockResolvedValue({} as never);
+    vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: false, motivo: "sin clave" });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const resultado = await authService.olvideContrasena(admin.email);
+
+    expect(resultado).toEqual({ enviado: false });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(admin.email));
+    // El enlace es el secreto: no puede terminar en un log.
+    expect(warn.mock.calls[0]![0]).not.toContain("token=");
+  });
+
+  it("no anota nada cuando el correo sale bien", async () => {
+    vi.spyOn(authRepository, "findUserByEmail").mockResolvedValue({ ...admin } as never);
+    vi.spyOn(authRepository, "createAccessLink").mockResolvedValue({} as never);
+    vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: true });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(await authService.olvideContrasena(admin.email)).toEqual({ enviado: true });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("no revela si el correo existe cuando la cuenta está suspendida", async () => {
+    vi.spyOn(authRepository, "findUserByEmail").mockResolvedValue({
+      ...admin,
+      isActive: false,
+    } as never);
+    const enviar = vi.spyOn(emailService, "enviar");
+
+    expect(await authService.olvideContrasena(admin.email)).toEqual({ enviado: false });
+    expect(enviar).not.toHaveBeenCalled();
+  });
+});
