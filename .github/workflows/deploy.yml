@@ -92,6 +92,21 @@ jobs:
             --group-id "$SECURITY_GROUP" \
             --protocol tcp --port 22 --cidr "$IP/32"
 
+      - uses: actions/checkout@v4
+
+      # Sin esto, un cambio en el compose o en el Caddyfile nunca llega al
+      # servidor y el despliegue sigue usando la version vieja sin avisar.
+      # El .env vive solo alla y no esta en el repositorio, asi que no se pisa.
+      - name: Copiar la configuración de despliegue
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: deploy/*
+          target: ~/lc-fragance-backend
+          strip_components: 0
+
       - name: Actualizar el servidor
         uses: appleboy/ssh-action@v1
         with:
