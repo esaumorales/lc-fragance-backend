@@ -13,7 +13,6 @@ env:
   # El 22 esta cerrado salvo durante el despliegue; este es el grupo donde se
   # abre y se vuelve a cerrar. El identificador no es un dato sensible.
   SECURITY_GROUP: sg-0dbd60e73b5098397
-  AWS_REGION: us-east-1
 
 jobs:
   publicar:
@@ -49,11 +48,38 @@ jobs:
       contents: read
       packages: read
     steps:
+      # Sin esto, un secreto mal escrito falla dentro de una accion y el log
+      # no dice cual es. Aca se nombra el que falta, sin mostrar su valor.
+      - name: Comprobar que estan los secretos
+        env:
+          CLAVE: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          SECRETO: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          HOST: ${{ secrets.SSH_HOST }}
+          USUARIO: ${{ secrets.SSH_USER }}
+          LLAVE: ${{ secrets.SSH_KEY }}
+        run: |
+          faltan=""
+          [ -z "$CLAVE" ]    && faltan="$faltan AWS_ACCESS_KEY_ID"
+          [ -z "$SECRETO" ]  && faltan="$faltan AWS_SECRET_ACCESS_KEY"
+          [ -z "$HOST" ]     && faltan="$faltan SSH_HOST"
+          [ -z "$USUARIO" ]  && faltan="$faltan SSH_USER"
+          [ -z "$LLAVE" ]    && faltan="$faltan SSH_KEY"
+          if [ -n "$faltan" ]; then
+            echo "Faltan estos secretos en el repositorio:$faltan"
+            echo "Se cargan en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          case "$LLAVE" in
+            *"BEGIN OPENSSH PRIVATE KEY"*) ;;
+            *) echo "SSH_KEY no parece una clave privada completa"; exit 1 ;;
+          esac
+          echo "Los cinco secretos estan cargados."
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
 
       # El runner tiene una IP distinta cada vez: se abre solo para esa y se
       # cierra al terminar. El usuario IAM no puede hacer nada mas que esto.
