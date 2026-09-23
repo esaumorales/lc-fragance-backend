@@ -3,9 +3,15 @@ import { Prisma } from "@prisma/client";
 import { checkoutService } from "@/services/checkout.service";
 import { cartRepository } from "@/repositories/cart.repository";
 import { orderRepository } from "@/repositories/order.repository";
+import { env } from "@/config/env";
+
+// El telefono se fija en cada prueba y no se hereda del .env: si no, el
+// resultado depende de la maquina donde corra.
+const telefonoOriginal = env.checkout.whatsappPhone;
 
 afterEach(() => {
   vi.restoreAllMocks();
+  env.checkout.whatsappPhone = telefonoOriginal;
 });
 
 const userId = "660e8400-e29b-41d4-a716-446655440001";
@@ -45,6 +51,7 @@ describe("checkoutService.checkout", () => {
   });
 
   it("crea el pedido, emite stock:updated por cada item y arma el link de WhatsApp", async () => {
+    env.checkout.whatsappPhone = "51999888777";
     const cart = cartWithItems([
       { quantity: 2, stock: 10, price: 25 },
       { quantity: 1, stock: 5, price: 40 },
@@ -65,5 +72,21 @@ describe("checkoutService.checkout", () => {
     expect(emit).toHaveBeenCalledWith({ productId: cart.items[1].productId, stock: 4 });
     expect(result.whatsappUrl).toContain("wa.me");
     expect(result.whatsappUrl).toContain(encodeURIComponent("order-1".slice(0, 8)));
+  });
+
+  it("deja el link en null si no hay telefono configurado", async () => {
+    env.checkout.whatsappPhone = "";
+    const cart = cartWithItems([{ quantity: 1, stock: 3, price: 10 }]);
+    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(cart as never);
+    vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
+      id: "order-2",
+      status: "PENDING",
+      total: new Prisma.Decimal(10),
+    } as never);
+
+    const result = await checkoutService.checkout(userId);
+
+    expect(result.order.id).toBe("order-2");
+    expect(result.whatsappUrl).toBeNull();
   });
 });
