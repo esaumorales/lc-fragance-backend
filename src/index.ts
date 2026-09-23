@@ -9,6 +9,6 @@ const io = createSocketServer(httpServer);
 app.set("io", io);
 
 httpServer.listen(env.port, () => {
-  console.log(`Lyon Call API escuchando en http://localhost:${env.port}`);
+  console.log(`LC Fragance API escuchando en http://localhost:${env.port}`);
   console.log(`Docs (Scalar) en http://localhost:${env.port}/docs`);
 });

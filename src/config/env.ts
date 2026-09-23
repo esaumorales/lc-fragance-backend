@@ -30,13 +30,13 @@ export const env = {
 
   resend: {
     apiKey: process.env.RESEND_API_KEY ?? "",
-    emailFrom: process.env.EMAIL_FROM ?? "Lyon Call <no-reply@lyoncall.com>",
+    emailFrom: process.env.EMAIL_FROM ?? "LC Fragance <no-reply@lcfragance.com>",
   },
 
   // Checkout sin pasarela de pago: el pedido se cierra por WhatsApp/Yape.
   checkout: {
     whatsappPhone: process.env.WHATSAPP_PHONE ?? "",
     yapePhone: process.env.YAPE_PHONE ?? "",
-    yapeName: process.env.YAPE_NAME ?? "Lyon Call",
+    yapeName: process.env.YAPE_NAME ?? "LC Fragance",
   },
 };

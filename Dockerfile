@@ -19,18 +19,21 @@ FROM node:22-alpine AS prod-deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile --prod
+# El cliente se genera aca, no en el build: con pnpm no queda en
+# node_modules/.prisma sino dentro del propio paquete, en el store de .pnpm.
+RUN pnpm exec prisma generate
 
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S lc && adduser -S lc -G lc
 
+# Trae las dependencias con el cliente de Prisma ya generado adentro.
 COPY --from=prod-deps /app/node_modules ./node_modules
-# El cliente generado por Prisma vive aparte y hay que traerlo del build.
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/prisma ./prisma
+COPY prisma ./prisma
 COPY package.json ./
 
 USER lc

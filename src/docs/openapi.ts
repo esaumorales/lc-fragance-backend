@@ -33,9 +33,9 @@ export function generateOpenApiDocument() {
   return generator.generateDocument({
     openapi: "3.0.0",
     info: {
-      title: "Lyon Call API",
+      title: "LC Fragance API",
       version: "0.1.0",
-      description: "API de la tienda Lyon Call (perfumes árabes y de diseñador, y a futuro otras categorías).",
+      description: "API de la tienda LC Fragance (perfumes árabes y de diseñador, y a futuro otras categorías).",
     },
     servers: [{ url: "/api" }],
   });
