@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Entorno: nunca se versiona, hay secretos adentro
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store
+Thumbs.db

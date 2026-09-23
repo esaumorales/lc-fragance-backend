@@ -1,0 +1,14 @@
+# Caddy saca y renueva el certificado TLS solo; no hay que tocar nada.
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	# El backend habla HTTP en la red interna; el TLS termina aca.
+	reverse_proxy backend:4001
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

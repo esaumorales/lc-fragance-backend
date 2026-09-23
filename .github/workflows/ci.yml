@@ -1,0 +1,27 @@
+name: CI
+
+# Corre en las tres ramas y en cada pull request: si falla, no se despliega.
+on:
+  push:
+    branches: [production, test, esau]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      # El cliente de Prisma se genera antes del typecheck o falla.
+      - run: pnpm exec prisma generate
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - run: pnpm run build
