@@ -55,8 +55,10 @@ export const confirmacionService = {
 
     // Tiene que ser de esta persona y de este proposito: un codigo de ingreso
     // no puede servir para autorizar una accion.
+    // 422 y no 401: el cliente trata el 401 como sesion vencida, renueva y
+    // reintenta. Un codigo equivocado no tiene nada que ver con la sesion.
     if (!desafio || desafio.userId !== userId || desafio.purpose !== "ACTION") {
-      throw new ApiError(401, "Código inválido");
+      throw new ApiError(422, "Código inválido");
     }
 
     const resultado = verificarCodigo(desafio, codigo);
@@ -70,7 +72,7 @@ export const confirmacionService = {
         "sin-intentos": "Demasiados intentos, pedí un código nuevo",
         incorrecto: "Código inválido",
       };
-      throw new ApiError(401, mensajes[resultado.motivo]);
+      throw new ApiError(422, mensajes[resultado.motivo]);
     }
 
     await authRepository.markCodeUsed(desafio.id);

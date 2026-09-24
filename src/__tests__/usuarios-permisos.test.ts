@@ -79,9 +79,9 @@ describe("tocar cuentas", () => {
     expect(res.status).toBe(428);
   });
 
-  it("con un código equivocado, 401 y no se toca nada", async () => {
+  it("con un código equivocado, 422 y no se toca nada", async () => {
     vi.spyOn(confirmacionService, "validar").mockRejectedValue(
-      new ApiError(401, "Código inválido")
+      new ApiError(422, "Código inválido")
     );
     const actualizar = vi.spyOn(adminUserService, "actualizar");
 
@@ -92,7 +92,7 @@ describe("tocar cuentas", () => {
       .set("x-confirmacion-codigo", "000000")
       .send({ isActive: false });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(422);
     expect(actualizar).not.toHaveBeenCalled();
   });
 

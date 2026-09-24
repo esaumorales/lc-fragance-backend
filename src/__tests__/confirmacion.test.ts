@@ -92,7 +92,7 @@ describe("confirmacionService.validar", () => {
 
     await expect(
       confirmacionService.validar(duenio.id, confirmacionId, "123456")
-    ).rejects.toMatchObject({ status: 401 });
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   // Ni siquiera con el código correcto de otra persona.
@@ -103,7 +103,7 @@ describe("confirmacionService.validar", () => {
 
     await expect(
       confirmacionService.validar(duenio.id, confirmacionId, "123456")
-    ).rejects.toMatchObject({ status: 401 });
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   it("rechaza el código equivocado y suma el intento", async () => {
@@ -112,7 +112,7 @@ describe("confirmacionService.validar", () => {
 
     await expect(
       confirmacionService.validar(duenio.id, confirmacionId, "000000")
-    ).rejects.toMatchObject({ status: 401 });
+    ).rejects.toMatchObject({ status: 422 });
     expect(sumar).toHaveBeenCalledOnce();
   });
 
@@ -123,7 +123,7 @@ describe("confirmacionService.validar", () => {
 
     await expect(
       confirmacionService.validar(duenio.id, confirmacionId, "123456")
-    ).rejects.toMatchObject({ status: 401 });
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   it("rechaza uno vencido", async () => {
@@ -133,7 +133,7 @@ describe("confirmacionService.validar", () => {
 
     await expect(
       confirmacionService.validar(duenio.id, confirmacionId, "123456")
-    ).rejects.toMatchObject({ status: 401 });
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   it("rechaza una confirmación inexistente", async () => {
@@ -141,6 +141,6 @@ describe("confirmacionService.validar", () => {
 
     await expect(
       confirmacionService.validar(duenio.id, confirmacionId, "123456")
-    ).rejects.toMatchObject({ status: 401 });
+    ).rejects.toMatchObject({ status: 422 });
   });
 });
