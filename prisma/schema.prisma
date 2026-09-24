@@ -67,6 +67,10 @@ model Address {
   city       String
   region     String?
   postalCode String?
+  // Punto exacto en el mapa. Opcional: la direccion escrita alcanza para
+  // enviar, esto solo ayuda a encontrarla.
+  latitude   Float?
+  longitude  Float?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

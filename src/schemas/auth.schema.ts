@@ -94,6 +94,13 @@ export const direccionSchema = z
     city: z.string().trim().min(2).max(120),
     region: opcional(120),
     postalCode: opcional(20),
+    // Punto en el mapa, opcional. Los rangos evitan guardar coordenadas
+    // imposibles si llega cualquier cosa.
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+  })
+  .refine((d) => (d.latitude === null || d.latitude === undefined) === (d.longitude === null || d.longitude === undefined), {
+    message: "El punto necesita latitud y longitud, o ninguna de las dos",
   })
   .openapi("Direccion");
 

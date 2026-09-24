@@ -97,3 +97,54 @@ describe("authService.eliminarDireccion", () => {
     expect(borrar).toHaveBeenCalledWith(userId);
   });
 });
+
+describe("el punto en el mapa", () => {
+  it("es opcional: una dirección sin coordenadas vale", () => {
+    expect(
+      direccionSchema.safeParse({ street: "Jr. Union 123", district: "Cercado", city: "Lima" })
+        .success
+    ).toBe(true);
+  });
+
+  it("acepta un punto válido", () => {
+    const resultado = direccionSchema.parse({
+      street: "Jr. Union 123",
+      district: "Cercado",
+      city: "Lima",
+      latitude: -12.0464,
+      longitude: -77.0428,
+    });
+    expect(resultado.latitude).toBe(-12.0464);
+  });
+
+  // Media coordenada no ubica nada: o van las dos o ninguna.
+  it("rechaza la latitud sola", () => {
+    const resultado = direccionSchema.safeParse({
+      street: "Jr. Union 123",
+      district: "Cercado",
+      city: "Lima",
+      latitude: -12.0464,
+    });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza coordenadas imposibles", () => {
+    const base = { street: "Jr. Union 123", district: "Cercado", city: "Lima" };
+    expect(direccionSchema.safeParse({ ...base, latitude: 120, longitude: 0 }).success).toBe(false);
+    expect(direccionSchema.safeParse({ ...base, latitude: 0, longitude: 200 }).success).toBe(false);
+  });
+
+  it("guardar sin punto lo deja en null, no sin tocar", async () => {
+    const guardar = vi.spyOn(authRepository, "upsertAddress").mockResolvedValue({} as never);
+
+    await authService.guardarDireccion(userId, {
+      street: "Jr. Union 123",
+      district: "Cercado",
+      city: "Lima",
+    });
+
+    const [, datos] = guardar.mock.calls[0]!;
+    expect(datos.latitude).toBeNull();
+    expect(datos.longitude).toBeNull();
+  });
+});

@@ -24,6 +24,8 @@ const CON_DIRECCION = {
       city: true,
       region: true,
       postalCode: true,
+      latitude: true,
+      longitude: true,
     },
   },
 } satisfies Prisma.UserSelect;

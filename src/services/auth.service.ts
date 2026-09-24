@@ -257,6 +257,8 @@ export const authService = {
       reference: datos.reference || null,
       region: datos.region || null,
       postalCode: datos.postalCode || null,
+      latitude: datos.latitude ?? null,
+      longitude: datos.longitude ?? null,
     });
   },
 
