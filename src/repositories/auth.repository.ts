@@ -40,6 +40,10 @@ export const authRepository = {
     });
   },
 
+  updateProfile(userId: string, data: { name?: string; email?: string }) {
+    return prisma.user.update({ where: { id: userId }, data });
+  },
+
   updatePassword(userId: string, password: string) {
     return prisma.user.update({ where: { id: userId }, data: { password } });
   },

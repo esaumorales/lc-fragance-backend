@@ -3,6 +3,8 @@ import { randomBytes } from "crypto";
 import type { Role } from "@prisma/client";
 import { authRepository } from "@/repositories/auth.repository";
 import type {
+  ActualizarPerfilInput,
+  CambiarClaveInput,
   LoginInput,
   RegisterInput,
   RestablecerInput,
@@ -201,6 +203,56 @@ export const authService = {
     await authRepository.revokeAllRefreshTokens(enlace.userId);
 
     return { email: enlace.user.email };
+  },
+
+  async actualizarPerfil(userId: string, datos: ActualizarPerfilInput) {
+    const user = await authRepository.findUserById(userId);
+    if (!user) {
+      throw new ApiError(401, "Usuario no encontrado");
+    }
+
+    const cambiaElCorreo = datos.email !== undefined && datos.email !== user.email;
+
+    if (cambiaElCorreo) {
+      // Confirmar la contraseña: con una sesión robada, cambiar el correo
+      // bastaría para quedarse con la cuenta.
+      if (!datos.password) {
+        throw new ApiError(400, "Para cambiar el correo hay que confirmar la contraseña");
+      }
+      if (!(await argon2.verify(user.password, datos.password))) {
+        throw new ApiError(401, "La contraseña no coincide");
+      }
+
+      const otro = await authRepository.findUserByEmail(datos.email!);
+      if (otro && otro.id !== userId) {
+        throw new ApiError(409, "Ese correo ya tiene cuenta");
+      }
+    }
+
+    const actualizado = await authRepository.updateProfile(userId, {
+      ...(datos.name !== undefined ? { name: datos.name } : {}),
+      ...(cambiaElCorreo ? { email: datos.email } : {}),
+    });
+
+    return toAuthUser(actualizado);
+  },
+
+  async cambiarContrasena(userId: string, datos: CambiarClaveInput) {
+    const user = await authRepository.findUserById(userId);
+    if (!user) {
+      throw new ApiError(401, "Usuario no encontrado");
+    }
+    if (!(await argon2.verify(user.password, datos.actual))) {
+      throw new ApiError(401, "La contraseña actual no coincide");
+    }
+
+    await authRepository.updatePassword(userId, await argon2.hash(datos.nueva));
+    // Se caen todas las sesiones abiertas con la clave vieja, incluida esta;
+    // por eso se emite uno nuevo y quien cambió la clave sigue adentro.
+    await authRepository.revokeAllRefreshTokens(userId);
+
+    const tokens = await issueTokens(toAuthUser(user));
+    return { ...tokens, user: toAuthUser(user) };
   },
 
   async refresh(refreshToken: string) {

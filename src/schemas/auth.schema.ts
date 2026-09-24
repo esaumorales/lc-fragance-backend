@@ -59,6 +59,28 @@ export const restablecerSchema = z
   })
   .openapi("RestablecerContrasena");
 
+export const actualizarPerfilSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120).optional(),
+    email: z.string().trim().toLowerCase().email().optional(),
+    // Solo hace falta para cambiar el correo: con una sesion robada, si no,
+    // alcanzaria con cambiarlo para quedarse con la cuenta.
+    password: z.string().min(1).optional(),
+  })
+  .refine((d) => d.name !== undefined || d.email !== undefined, {
+    message: "No hay nada que cambiar",
+  })
+  .openapi("ActualizarPerfil");
+
+export const cambiarClaveSchema = z
+  .object({
+    actual: z.string().min(1),
+    nueva: z.string().min(8).max(72),
+  })
+  .openapi("CambiarClave");
+
+export type ActualizarPerfilInput = z.infer<typeof actualizarPerfilSchema>;
+export type CambiarClaveInput = z.infer<typeof cambiarClaveSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type VerificarCodigoInput = z.infer<typeof verificarCodigoSchema>;

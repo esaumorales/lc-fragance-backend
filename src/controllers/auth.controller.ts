@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { authService } from "@/services/auth.service";
 import {
+  actualizarPerfilSchema,
+  cambiarClaveSchema,
   loginSchema,
   olvideSchema,
   registerSchema,
@@ -92,6 +94,21 @@ export const authController = {
     }
     res.clearCookie(REFRESH_COOKIE, { path: "/api/auth" });
     res.status(204).send();
+  },
+
+  async actualizarPerfil(req: Request, res: Response) {
+    const datos = actualizarPerfilSchema.parse(req.body);
+    res.json({ user: await authService.actualizarPerfil(req.user!.sub, datos) });
+  },
+
+  async cambiarClave(req: Request, res: Response) {
+    const datos = cambiarClaveSchema.parse(req.body);
+    const { accessToken, refreshToken, user } = await authService.cambiarContrasena(
+      req.user!.sub,
+      datos
+    );
+    setRefreshCookie(res, refreshToken);
+    res.json({ accessToken, user });
   },
 
   async me(req: Request, res: Response) {
