@@ -11,19 +11,44 @@ const CAMPOS_PUBLICOS = {
   createdAt: true,
 } satisfies Prisma.UserSelect;
 
-const ROLES_DEL_PANEL: Role[] = ["ADMIN", "SUPERADMIN"];
+// La direccion es de solo lectura para el panel: sirve para coordinar envios.
+const CON_DIRECCION = {
+  ...CAMPOS_PUBLICOS,
+  address: {
+    select: {
+      recipient: true,
+      phone: true,
+      street: true,
+      reference: true,
+      district: true,
+      city: true,
+      region: true,
+      postalCode: true,
+    },
+  },
+} satisfies Prisma.UserSelect;
 
 export const adminUserRepository = {
-  listar() {
+  listar(rol?: Role) {
     return prisma.user.findMany({
-      where: { role: { in: ROLES_DEL_PANEL } },
-      select: CAMPOS_PUBLICOS,
+      where: rol ? { role: rol } : undefined,
+      select: CON_DIRECCION,
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     });
   },
 
+  // Para el resumen: cuantos hay de cada rol.
+  async contarPorRol() {
+    const filas = await prisma.user.groupBy({ by: ["role"], _count: { _all: true } });
+    const conteo: Record<string, number> = { CUSTOMER: 0, ADMIN: 0, SUPERADMIN: 0 };
+    for (const fila of filas) {
+      conteo[fila.role] = fila._count._all;
+    }
+    return { total: Object.values(conteo).reduce((a, b) => a + b, 0), porRol: conteo };
+  },
+
   buscarPorId(id: string) {
-    return prisma.user.findUnique({ where: { id }, select: CAMPOS_PUBLICOS });
+    return prisma.user.findUnique({ where: { id }, select: CON_DIRECCION });
   },
 
   buscarPorEmail(email: string) {
@@ -31,11 +56,11 @@ export const adminUserRepository = {
   },
 
   crear(data: { name: string; email: string; role: Role; password: string }) {
-    return prisma.user.create({ data, select: CAMPOS_PUBLICOS });
+    return prisma.user.create({ data, select: CON_DIRECCION });
   },
 
-  actualizar(id: string, data: { name?: string; role?: Role; isActive?: boolean }) {
-    return prisma.user.update({ where: { id }, data, select: CAMPOS_PUBLICOS });
+  actualizar(id: string, data: { name?: string; email?: string; role?: Role; isActive?: boolean }) {
+    return prisma.user.update({ where: { id }, data, select: CON_DIRECCION });
   },
 
   eliminar(id: string) {

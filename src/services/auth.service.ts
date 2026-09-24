@@ -132,7 +132,9 @@ export const authService = {
 
   async verificarSegundoFactor(data: VerificarCodigoInput) {
     const desafio = await authRepository.findVerificationCode(data.desafioId);
-    if (!desafio) {
+    // El proposito importa: un codigo pedido para confirmar una accion no
+    // puede servir para abrir una sesion.
+    if (!desafio || desafio.purpose !== "LOGIN") {
       throw new ApiError(401, "Código inválido");
     }
 

@@ -6,13 +6,13 @@ import { env } from "@/config/env";
 
 function buildWhatsappMessage(orderId: string, items: { name: string; quantity: number; unitPrice: Prisma.Decimal }[], total: Prisma.Decimal) {
   const lines = items.map(
-    (item) => `- ${item.quantity}x ${item.name} ($${item.unitPrice.toString()} c/u)`
+    (item) => `- ${item.quantity}x ${item.name} (S/ ${item.unitPrice.toString()} c/u)`
   );
 
   return [
     `Hola, hice el pedido #${orderId.slice(0, 8)} y quiero coordinar el pago:`,
     ...lines,
-    `Total: $${total.toString()}`,
+    `Total: S/ ${total.toString()}`,
     `Pago por Yape a nombre de ${env.checkout.yapeName} (${env.checkout.yapePhone}).`,
   ].join("\n");
 }

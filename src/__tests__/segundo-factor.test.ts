@@ -95,6 +95,7 @@ describe("login de un administrador", () => {
 describe("authService.verificarSegundoFactor", () => {
   const desafioValido = {
     id: "880e8400-e29b-41d4-a716-446655440010",
+    purpose: "LOGIN",
     codeHash: hashearCodigo("123456"),
     attempts: 0,
     usedAt: null,
@@ -140,6 +141,18 @@ describe("authService.verificarSegundoFactor", () => {
     ).rejects.toMatchObject({ status: 401 });
 
     expect(sumar).not.toHaveBeenCalled();
+  });
+
+  // Un codigo pedido para confirmar una accion no puede abrir una sesion.
+  it("rechaza un código pedido para confirmar una acción", async () => {
+    vi.spyOn(authRepository, "findVerificationCode").mockResolvedValue({
+      ...desafioValido,
+      purpose: "ACTION",
+    } as never);
+
+    await expect(
+      authService.verificarSegundoFactor({ desafioId: desafioValido.id, codigo: "123456" })
+    ).rejects.toMatchObject({ status: 401 });
   });
 
   it("rechaza un desafío inexistente", async () => {

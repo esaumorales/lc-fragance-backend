@@ -60,6 +60,18 @@ export const plantillas = {
     `;
   },
 
+  codigoDeAccion(nombre: string, codigo: string, minutos: number): Mensaje["html"] {
+    return `
+      <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#1a1a1a">Confirmá la acción</h2>
+        <p>Hola ${escapar(nombre)}, alguien con tu sesión abierta pidió hacer un cambio delicado en el panel.</p>
+        <p style="font-size:32px;letter-spacing:8px;font-weight:700;margin:24px 0">${escapar(codigo)}</p>
+        <p style="color:#666">Vence en ${minutos} minutos y sirve una sola vez.</p>
+        <p style="color:#666">Si no fuiste vos, cerrá sesión y cambiá tu contraseña.</p>
+      </div>
+    `;
+  },
+
   invitacion(nombre: string, enlace: string, horas: number): Mensaje["html"] {
     return `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto">

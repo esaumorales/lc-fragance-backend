@@ -14,6 +14,7 @@ export const crearAdminSchema = z
 export const actualizarAdminSchema = z
   .object({
     name: z.string().trim().min(2).max(120).optional(),
+    email: z.string().trim().toLowerCase().email().optional(),
     role: rolDePanel.optional(),
     isActive: z.boolean().optional(),
   })
@@ -21,6 +22,9 @@ export const actualizarAdminSchema = z
     message: "No hay nada que cambiar",
   })
   .openapi("ActualizarAdmin");
+
+// El listado admite filtrar por rol; sin filtro vienen todas las cuentas.
+export const filtroDeUsuariosSchema = z.enum(["CUSTOMER", "ADMIN", "SUPERADMIN"]);
 
 export const adminSchema = z
   .object({

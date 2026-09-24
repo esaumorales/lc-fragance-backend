@@ -6,6 +6,7 @@ import { ApiError } from "@/middlewares/error-handler";
 import { puedeActualizar, puedeEliminar } from "@/lib/reglas-admin";
 import { HORAS_DEL_ENLACE, armarUrlDeEnlace, generarTokenDeEnlace } from "@/services/auth.service";
 import { emailService, plantillas } from "@/services/email.service";
+import type { Role } from "@prisma/client";
 import type { ActualizarAdminInput, CrearAdminInput } from "@/schemas/admin-user.schema";
 
 // El alta no fija contraseña: se pone una al azar que nadie conoce y el invitado
@@ -22,8 +23,12 @@ async function crearEnlace(userId: string, proposito: "INVITE" | "RESET") {
 }
 
 export const adminUserService = {
-  listar() {
-    return adminUserRepository.listar();
+  async listar(rol?: Role) {
+    const [usuarios, conteo] = await Promise.all([
+      adminUserRepository.listar(rol),
+      adminUserRepository.contarPorRol(),
+    ]);
+    return { ...conteo, usuarios };
   },
 
   async crear(data: CrearAdminInput) {
@@ -65,6 +70,13 @@ export const adminUserService = {
     );
     if (!veredicto.permitido) {
       throw new ApiError(409, veredicto.motivo);
+    }
+
+    if (cambios.email && cambios.email !== objetivo.email) {
+      const otro = await adminUserRepository.buscarPorEmail(cambios.email);
+      if (otro && otro.id !== id) {
+        throw new ApiError(409, "Ese correo ya tiene cuenta");
+      }
     }
 
     const actualizado = await adminUserRepository.actualizar(id, cambios);

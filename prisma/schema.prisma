@@ -20,6 +20,12 @@ enum LinkPurpose {
   RESET
 }
 
+// Para que sirve un codigo: entrar, o confirmar una accion delicada ya dentro.
+enum CodePurpose {
+  LOGIN
+  ACTION
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -67,9 +73,11 @@ model Address {
 
 // Segundo factor: el codigo que llega al correo al iniciar sesion como admin.
 model VerificationCode {
-  id        String    @id @default(uuid())
+  id        String      @id @default(uuid())
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Un codigo de accion no sirve para entrar ni al reves.
+  purpose   CodePurpose @default(LOGIN)
   // Se guarda el hash, igual que los refresh: si se filtra la tabla no sirve.
   codeHash  String
   attempts  Int       @default(0)

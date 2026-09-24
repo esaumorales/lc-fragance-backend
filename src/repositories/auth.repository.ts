@@ -1,4 +1,4 @@
-import type { LinkPurpose, Prisma } from "@prisma/client";
+import type { CodePurpose, LinkPurpose, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { RegisterInput } from "@/schemas/auth.schema";
 
@@ -66,13 +66,23 @@ export const authRepository = {
     return prisma.user.update({ where: { id: userId }, data: { password } });
   },
 
-  // Un codigo nuevo anula los anteriores: si no, los viejos siguen sirviendo.
-  async createVerificationCode(userId: string, codeHash: string, expiresAt: Date) {
+  /**
+   * Crea un codigo y anula los anteriores del mismo proposito.
+   *
+   * Se anulan solo los del mismo proposito: pedir una confirmacion de accion
+   * no tiene por que invalidar un codigo de ingreso a medio usar.
+   */
+  async createVerificationCode(
+    userId: string,
+    codeHash: string,
+    expiresAt: Date,
+    purpose: CodePurpose = "LOGIN"
+  ) {
     await prisma.verificationCode.updateMany({
-      where: { userId, usedAt: null },
+      where: { userId, purpose, usedAt: null },
       data: { usedAt: new Date() },
     });
-    return prisma.verificationCode.create({ data: { userId, codeHash, expiresAt } });
+    return prisma.verificationCode.create({ data: { userId, codeHash, expiresAt, purpose } });
   },
 
   findVerificationCode(id: string) {
