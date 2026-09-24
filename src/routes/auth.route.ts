@@ -23,5 +23,8 @@ authRouter.post("/auth/refresh", asyncHandler(authController.refresh));
 authRouter.post("/auth/logout", asyncHandler(authController.logout));
 authRouter.get("/auth/me", requireAuth, asyncHandler(authController.me));
 authRouter.patch("/auth/me", requireAuth, asyncHandler(authController.actualizarPerfil));
+authRouter.get("/auth/direccion", requireAuth, asyncHandler(authController.verDireccion));
+authRouter.put("/auth/direccion", requireAuth, asyncHandler(authController.guardarDireccion));
+authRouter.delete("/auth/direccion", requireAuth, asyncHandler(authController.eliminarDireccion));
 // Con limite: probar contraseñas actuales a repeticion es fuerza bruta.
 authRouter.put("/auth/password", requireAuth, authLimiter, asyncHandler(authController.cambiarClave));

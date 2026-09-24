@@ -5,6 +5,7 @@ import { authRepository } from "@/repositories/auth.repository";
 import type {
   ActualizarPerfilInput,
   CambiarClaveInput,
+  DireccionInput,
   LoginInput,
   RegisterInput,
   RestablecerInput,
@@ -235,6 +236,30 @@ export const authService = {
     });
 
     return toAuthUser(actualizado);
+  },
+
+  obtenerDireccion(userId: string) {
+    return authRepository.findAddress(userId);
+  },
+
+  guardarDireccion(userId: string, datos: DireccionInput) {
+    // Los opcionales vacios se guardan como null: si fueran undefined, Prisma
+    // los ignoraria y no habria forma de borrar un dato ya cargado.
+    return authRepository.upsertAddress(userId, {
+      userId,
+      street: datos.street,
+      district: datos.district,
+      city: datos.city,
+      recipient: datos.recipient || null,
+      phone: datos.phone || null,
+      reference: datos.reference || null,
+      region: datos.region || null,
+      postalCode: datos.postalCode || null,
+    });
+  },
+
+  async eliminarDireccion(userId: string) {
+    await authRepository.deleteAddress(userId);
   },
 
   async cambiarContrasena(userId: string, datos: CambiarClaveInput) {

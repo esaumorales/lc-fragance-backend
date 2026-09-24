@@ -3,6 +3,7 @@ import { authService } from "@/services/auth.service";
 import {
   actualizarPerfilSchema,
   cambiarClaveSchema,
+  direccionSchema,
   loginSchema,
   olvideSchema,
   registerSchema,
@@ -109,6 +110,20 @@ export const authController = {
     );
     setRefreshCookie(res, refreshToken);
     res.json({ accessToken, user });
+  },
+
+  async verDireccion(req: Request, res: Response) {
+    res.json({ direccion: await authService.obtenerDireccion(req.user!.sub) });
+  },
+
+  async guardarDireccion(req: Request, res: Response) {
+    const datos = direccionSchema.parse(req.body);
+    res.json({ direccion: await authService.guardarDireccion(req.user!.sub, datos) });
+  },
+
+  async eliminarDireccion(req: Request, res: Response) {
+    await authService.eliminarDireccion(req.user!.sub);
+    res.status(204).send();
   },
 
   async me(req: Request, res: Response) {

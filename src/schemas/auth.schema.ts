@@ -79,6 +79,25 @@ export const cambiarClaveSchema = z
   })
   .openapi("CambiarClave");
 
+const opcional = (max: number) => z.string().trim().max(max).optional();
+
+export const direccionSchema = z
+  .object({
+    // Quien recibe puede no ser el titular de la cuenta.
+    recipient: opcional(120),
+    // El envio se coordina por WhatsApp: el telefono y la referencia pesan
+    // tanto como la calle.
+    phone: opcional(30),
+    street: z.string().trim().min(3).max(160),
+    reference: opcional(200),
+    district: z.string().trim().min(2).max(120),
+    city: z.string().trim().min(2).max(120),
+    region: opcional(120),
+    postalCode: opcional(20),
+  })
+  .openapi("Direccion");
+
+export type DireccionInput = z.infer<typeof direccionSchema>;
 export type ActualizarPerfilInput = z.infer<typeof actualizarPerfilSchema>;
 export type CambiarClaveInput = z.infer<typeof cambiarClaveSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;

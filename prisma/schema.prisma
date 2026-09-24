@@ -44,6 +44,25 @@ model User {
   orders            Order[]
   verificationCodes VerificationCode[]
   accessLinks       AccessLink[]
+  address           Address?
+}
+
+// Una direccion por cuenta: el envio se coordina por WhatsApp, asi que el
+// telefono y la referencia importan tanto como la calle.
+model Address {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipient  String?
+  phone      String?
+  street     String
+  reference  String?
+  district   String
+  city       String
+  region     String?
+  postalCode String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 // Segundo factor: el codigo que llega al correo al iniciar sesion como admin.

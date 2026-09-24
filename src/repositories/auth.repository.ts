@@ -1,4 +1,4 @@
-import type { LinkPurpose } from "@prisma/client";
+import type { LinkPurpose, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { RegisterInput } from "@/schemas/auth.schema";
 
@@ -38,6 +38,24 @@ export const authRepository = {
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+  },
+
+  findAddress(userId: string) {
+    return prisma.address.findUnique({ where: { userId } });
+  },
+
+  // Upsert: la cuenta tiene una sola direccion, se crea o se reemplaza.
+  upsertAddress(userId: string, data: Prisma.AddressUncheckedCreateInput) {
+    const { userId: _ignorado, ...campos } = data;
+    return prisma.address.upsert({
+      where: { userId },
+      create: { ...campos, userId },
+      update: campos,
+    });
+  },
+
+  deleteAddress(userId: string) {
+    return prisma.address.deleteMany({ where: { userId } });
   },
 
   updateProfile(userId: string, data: { name?: string; email?: string }) {
