@@ -50,7 +50,7 @@ describe("checkoutService.checkout", () => {
     await expect(checkoutService.checkout(userId)).rejects.toMatchObject({ status: 409 });
   });
 
-  it("crea el pedido, emite stock:updated por cada item y arma el link de WhatsApp", async () => {
+  it("crea el pedido pendiente y arma el link de WhatsApp", async () => {
     env.checkout.whatsappPhone = "51999888777";
     const cart = cartWithItems([
       { quantity: 2, stock: 10, price: 25 },
@@ -62,16 +62,32 @@ describe("checkoutService.checkout", () => {
       status: "PENDING",
       total: new Prisma.Decimal(90),
     } as never);
-    const emit = vi.fn();
 
-    const result = await checkoutService.checkout(userId, emit);
+    const result = await checkoutService.checkout(userId);
 
     expect(result.order.id).toBe("order-1");
-    expect(emit).toHaveBeenCalledTimes(2);
-    expect(emit).toHaveBeenCalledWith({ productId: cart.items[0].productId, stock: 8 });
-    expect(emit).toHaveBeenCalledWith({ productId: cart.items[1].productId, stock: 4 });
+    expect(result.order.status).toBe("PENDING");
     expect(result.whatsappUrl).toContain("wa.me");
     expect(result.whatsappUrl).toContain(encodeURIComponent("order-1".slice(0, 8)));
+  });
+
+  // Lo importante del cambio: un carrito abandonado no le quita unidades a
+  // nadie. El stock sale recien cuando el administrador confirma la compra.
+  it("no descuenta stock al hacer checkout", async () => {
+    env.checkout.whatsappPhone = "51999888777";
+    const cart = cartWithItems([{ quantity: 2, stock: 10, price: 25 }]);
+    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(cart as never);
+    const crear = vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
+      id: "order-2",
+      status: "PENDING",
+      total: new Prisma.Decimal(50),
+    } as never);
+    const confirmar = vi.spyOn(orderRepository, "confirmar");
+
+    await checkoutService.checkout(userId);
+
+    expect(crear).toHaveBeenCalledOnce();
+    expect(confirmar).not.toHaveBeenCalled();
   });
 
   it("deja el link en null si no hay telefono configurado", async () => {

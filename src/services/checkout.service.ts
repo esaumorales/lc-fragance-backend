@@ -3,7 +3,6 @@ import { cartRepository } from "@/repositories/cart.repository";
 import { orderRepository } from "@/repositories/order.repository";
 import { ApiError } from "@/middlewares/error-handler";
 import { env } from "@/config/env";
-import type { StockEmitter } from "@/services/product.service";
 
 function buildWhatsappMessage(orderId: string, items: { name: string; quantity: number; unitPrice: Prisma.Decimal }[], total: Prisma.Decimal) {
   const lines = items.map(
@@ -11,7 +10,7 @@ function buildWhatsappMessage(orderId: string, items: { name: string; quantity: 
   );
 
   return [
-    `Hola, quiero confirmar mi pedido #${orderId.slice(0, 8)}:`,
+    `Hola, hice el pedido #${orderId.slice(0, 8)} y quiero coordinar el pago:`,
     ...lines,
     `Total: $${total.toString()}`,
     `Pago por Yape a nombre de ${env.checkout.yapeName} (${env.checkout.yapePhone}).`,
@@ -19,7 +18,7 @@ function buildWhatsappMessage(orderId: string, items: { name: string; quantity: 
 }
 
 export const checkoutService = {
-  async checkout(userId: string, emit?: StockEmitter) {
+  async checkout(userId: string) {
     const cart = await cartRepository.findOrCreateByUserId(userId);
 
     if (cart.items.length === 0) {
@@ -45,11 +44,10 @@ export const checkoutService = {
       unitPrice: item.product.price,
     }));
 
+    // El stock no se toca aca: sale recien cuando el administrador confirma
+    // que la compra ocurrio. Si saliera ahora, cualquiera podria agotar el
+    // catalogo haciendo checkout y no pagando nunca.
     const order = await orderRepository.createFromCart(userId, cart.id, orderItems, total);
-
-    for (const item of cart.items) {
-      emit?.({ productId: item.productId, stock: item.product.stock - item.quantity });
-    }
 
     const whatsappMessage = buildWhatsappMessage(
       order.id,
