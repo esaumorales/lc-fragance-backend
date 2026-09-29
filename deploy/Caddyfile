@@ -12,3 +12,8 @@
 		-Server
 	}
 }
+
+# El panel de streaming corre en el mismo servidor, en su propio stack.
+streaming.m3biznovatech.com {
+	reverse_proxy c-streaming:3000
+}
