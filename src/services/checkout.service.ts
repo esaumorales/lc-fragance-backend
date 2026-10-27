@@ -6,21 +6,8 @@ import { env } from "@/config/env";
 import { precioVigente } from "@/lib/precio-vigente";
 import { adminUserRepository } from "@/repositories/admin-user.repository";
 import { telefonoDeContacto } from "@/lib/telefono-de-contacto";
+import { mensajeDePedido } from "@/lib/mensaje-de-pedido";
 
-function armarMensaje(orderId: string, items: { name: string; quantity: number; unitPrice: Prisma.Decimal }[], total: Prisma.Decimal) {
-  const lines = items.map(
-    (item) => `- ${item.quantity}x ${item.name} (S/ ${item.unitPrice.toString()} c/u)`
-  );
-
-  // No se pide comprobante: el pago lo da por bueno el administrador desde el
-  // panel, asi que el mensaje solo sirve para avisar y coordinar.
-  return [
-    `Hola, hice el pedido #${orderId.slice(0, 8)} y quiero coordinar el pago:`,
-    ...lines,
-    `Total: S/ ${total.toString()}`,
-    `Pago por Yape a nombre de ${env.checkout.yapeName} (${env.checkout.yapePhone}).`,
-  ].join("\n");
-}
 
 /**
  * El numero al que escribe quien compra.
@@ -77,7 +64,7 @@ export const checkoutService = {
     // catalogo haciendo checkout y no pagando nunca.
     const order = await orderRepository.createFromCart(userId, cart.id, lineas, total);
 
-    const mensaje = armarMensaje(
+    const mensaje = mensajeDePedido(
       order.id,
       cart.items.map((item, indice) => ({
         name: item.product.name,
