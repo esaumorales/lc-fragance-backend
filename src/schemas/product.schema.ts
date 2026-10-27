@@ -7,6 +7,9 @@ export const productSchema = z
     slug: z.string(),
     description: z.string(),
     price: z.string(),
+    offerPrice: z.string().nullable(),
+    offerStartsAt: z.string().nullable(),
+    offerEndsAt: z.string().nullable(),
     sku: z.string(),
     stock: z.number().int(),
     images: z.array(z.string().url()),
@@ -27,6 +30,9 @@ export const createProductSchema = z
       .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Slug inválido: usar minúsculas, números y guiones"),
     description: z.string().min(1),
     price: z.number().positive(),
+    offerPrice: z.number().positive().nullable().optional(),
+    offerStartsAt: z.coerce.date().nullable().optional(),
+    offerEndsAt: z.coerce.date().nullable().optional(),
     sku: z.string().min(1).max(64),
     stock: z.number().int().min(0).default(0),
     images: z.array(z.string().url()).default([]),
@@ -36,6 +42,34 @@ export const createProductSchema = z
     categoryId: z.string().uuid(),
   })
   .openapi("CreateProduct");
+
+/**
+ * Una oferta tiene que descontar algo y tiene que durar algo.
+ *
+ * Se valida aca y no en la pantalla: un precio de oferta mayor al normal
+ * encarece el producto sin que nadie lo note, y un "hasta" anterior al
+ * "desde" es una oferta que nunca rige.
+ */
+function revisarOferta<T extends z.ZodTypeAny>(esquema: T) {
+  return esquema
+    .refine(
+      (datos: z.infer<T>) =>
+        datos.offerPrice == null || datos.price == null || datos.offerPrice < datos.price,
+      { message: "El precio de oferta tiene que ser menor al normal", path: ["offerPrice"] }
+    )
+    .refine(
+      (datos: z.infer<T>) =>
+        !datos.offerStartsAt || !datos.offerEndsAt || datos.offerStartsAt <= datos.offerEndsAt,
+      { message: "La oferta termina antes de empezar", path: ["offerEndsAt"] }
+    )
+    .refine((datos: z.infer<T>) => datos.offerPrice != null || (!datos.offerStartsAt && !datos.offerEndsAt), {
+      message: "Para poner fechas hace falta un precio de oferta",
+      path: ["offerPrice"],
+    });
+}
+
+export const crearProductoSchema = revisarOferta(createProductSchema);
+export const actualizarProductoSchema = revisarOferta(createProductSchema.partial());
 
 export const updateProductSchema = createProductSchema.partial().openapi("UpdateProduct");
 

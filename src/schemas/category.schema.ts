@@ -9,6 +9,12 @@ export const categorySchema = z
   })
   .openapi("Category");
 
+// El listado agrega el conteo; la ficha suelta no, porque sumar los
+// descendientes necesita el arbol entero.
+export const categoryWithCountSchema = categorySchema
+  .extend({ productCount: z.number().int().nonnegative() })
+  .openapi("CategoryWithCount");
+
 export const createCategorySchema = z
   .object({
     name: z.string().min(2).max(80),

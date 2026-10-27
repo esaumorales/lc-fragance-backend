@@ -1,8 +1,9 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import { Prisma } from "@prisma/client";
 import { checkoutService } from "@/services/checkout.service";
 import { cartRepository } from "@/repositories/cart.repository";
 import { orderRepository } from "@/repositories/order.repository";
+import { adminUserRepository } from "@/repositories/admin-user.repository";
 import { env } from "@/config/env";
 
 // El telefono se fija en cada prueba y no se hereda del .env: si no, el
@@ -12,6 +13,23 @@ const telefonoOriginal = env.checkout.whatsappPhone;
 afterEach(() => {
   vi.restoreAllMocks();
   env.checkout.whatsappPhone = telefonoOriginal;
+});
+
+// El teléfono del botón sale del perfil de quien atiende. Por defecto nadie
+// cargó el suyo, así que cada prueba cae al número de configuración salvo que
+// diga lo contrario.
+function conContactos(contactos: { role: string; createdAt: Date; phone: string | null }[] = []) {
+  vi.spyOn(adminUserRepository, "contactosDelPanel").mockResolvedValue(
+    contactos.map((c) => ({
+      role: c.role,
+      createdAt: c.createdAt,
+      address: c.phone ? { phone: c.phone } : null,
+    })) as never
+  );
+}
+
+beforeEach(() => {
+  conContactos();
 });
 
 const userId = "660e8400-e29b-41d4-a716-446655440001";
@@ -104,5 +122,65 @@ describe("checkoutService.checkout", () => {
 
     expect(result.order.id).toBe("order-2");
     expect(result.whatsappUrl).toBeNull();
+  });
+
+  // El número ya no sale del .env sino del perfil: así se cambia desde la
+  // pantalla de perfil, sin tocar variables de entorno ni desplegar.
+  it("escribe al teléfono que el administrador puso en su perfil", async () => {
+    env.checkout.whatsappPhone = "51999999999";
+    conContactos([
+      { role: "SUPERADMIN", createdAt: new Date("2026-01-01"), phone: "+51 988 333 444" },
+    ]);
+    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(
+      cartWithItems([{ quantity: 1, stock: 3, price: 10 }]) as never
+    );
+    vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
+      id: "order-3",
+      status: "PENDING",
+      total: new Prisma.Decimal(10),
+    } as never);
+
+    const result = await checkoutService.checkout(userId);
+
+    expect(result.whatsappUrl).toContain("https://wa.me/51988333444");
+  });
+
+  // El mensaje ya no pide comprobante: el pago lo aprueba el administrador.
+  it("no le pide el comprobante a quien compra", async () => {
+    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(
+      cartWithItems([{ quantity: 1, stock: 3, price: 10 }]) as never
+    );
+    vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
+      id: "order-4",
+      status: "PENDING",
+      total: new Prisma.Decimal(10),
+    } as never);
+
+    const result = await checkoutService.checkout(userId);
+
+    expect(decodeURIComponent(result.whatsappUrl ?? "")).not.toMatch(/comprobante/i);
+  });
+
+  // Si la oferta se mostrara pero no se cobrara, el descuento sería mentira.
+  it("cobra el precio de oferta cuando está vigente", async () => {
+    const cart = cartWithItems([{ quantity: 2, stock: 5, price: 100 }]);
+    cart.items[0]!.product = {
+      ...cart.items[0]!.product,
+      offerPrice: new Prisma.Decimal(60),
+      offerStartsAt: null,
+      offerEndsAt: null,
+    } as never;
+    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(cart as never);
+    const crear = vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
+      id: "order-5",
+      status: "PENDING",
+      total: new Prisma.Decimal(120),
+    } as never);
+
+    await checkoutService.checkout(userId);
+
+    const [, , lineas, total] = crear.mock.calls[0]!;
+    expect(lineas[0]!.unitPrice.toString()).toBe("60");
+    expect(total.toString()).toBe("120");
   });
 });

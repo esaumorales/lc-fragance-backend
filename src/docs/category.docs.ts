@@ -1,6 +1,11 @@
 import { z } from "@/lib/zod-openapi";
 import { registry } from "@/docs/registry";
-import { categorySchema, createCategorySchema, updateCategorySchema } from "@/schemas/category.schema";
+import {
+  categorySchema,
+  categoryWithCountSchema,
+  createCategorySchema,
+  updateCategorySchema,
+} from "@/schemas/category.schema";
 
 const errorSchema = z.object({ error: z.string() });
 
@@ -12,7 +17,7 @@ registry.registerPath({
   responses: {
     200: {
       description: "Lista de categorías",
-      content: { "application/json": { schema: z.array(categorySchema) } },
+      content: { "application/json": { schema: z.array(categoryWithCountSchema) } },
     },
   },
 });

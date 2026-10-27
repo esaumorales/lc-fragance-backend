@@ -25,7 +25,9 @@ adminUserRouter.get(
   puedeVer,
   asyncHandler(async (req, res) => {
     const filtro = filtroDeUsuariosSchema.safeParse(req.query.rol);
-    res.json(await adminUserService.listar(filtro.success ? filtro.data : undefined));
+    res.json(
+      await adminUserService.listar(req.user!.role, filtro.success ? filtro.data : undefined)
+    );
   })
 );
 

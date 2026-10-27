@@ -31,22 +31,37 @@ const CON_DIRECCION = {
 } satisfies Prisma.UserSelect;
 
 export const adminUserRepository = {
-  listar(rol?: Role) {
+  listar(roles: Role[]) {
     return prisma.user.findMany({
-      where: rol ? { role: rol } : undefined,
+      where: { role: { in: roles } },
       select: CON_DIRECCION,
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     });
   },
 
-  // Para el resumen: cuantos hay de cada rol.
-  async contarPorRol() {
-    const filas = await prisma.user.groupBy({ by: ["role"], _count: { _all: true } });
-    const conteo: Record<string, number> = { CUSTOMER: 0, ADMIN: 0, SUPERADMIN: 0 };
+  // Para el resumen. Cuenta solo los roles que el que mira puede ver: el
+  // total tambien es informacion, y un administrador no tiene por que saber
+  // cuantos clientes o cuantos dueños hay.
+  async contarPorRol(roles: Role[]) {
+    const filas = await prisma.user.groupBy({
+      by: ["role"],
+      where: { role: { in: roles } },
+      _count: { _all: true },
+    });
+    const conteo = Object.fromEntries(roles.map((rol) => [rol, 0])) as Record<string, number>;
     for (const fila of filas) {
       conteo[fila.role] = fila._count._all;
     }
     return { total: Object.values(conteo).reduce((a, b) => a + b, 0), porRol: conteo };
+  },
+
+  // Para el boton de WhatsApp del carrito: quien atiende y con que numero.
+  contactosDelPanel() {
+    return prisma.user.findMany({
+      where: { role: { in: ["ADMIN", "SUPERADMIN"] }, isActive: true },
+      select: { role: true, createdAt: true, address: { select: { phone: true } } },
+      orderBy: { createdAt: "asc" },
+    });
   },
 
   buscarPorId(id: string) {

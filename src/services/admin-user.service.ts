@@ -4,6 +4,7 @@ import { adminUserRepository } from "@/repositories/admin-user.repository";
 import { authRepository } from "@/repositories/auth.repository";
 import { ApiError } from "@/middlewares/error-handler";
 import { puedeActualizar, puedeEliminar } from "@/lib/reglas-admin";
+import { filtroDeRoles } from "@/lib/visibilidad-usuarios";
 import { HORAS_DEL_ENLACE, armarUrlDeEnlace, generarTokenDeEnlace } from "@/services/auth.service";
 import { emailService, plantillas } from "@/services/email.service";
 import type { Role } from "@prisma/client";
@@ -23,10 +24,17 @@ async function crearEnlace(userId: string, proposito: "INVITE" | "RESET") {
 }
 
 export const adminUserService = {
-  async listar(rol?: Role) {
+  /**
+   * El listado del panel, recortado a lo que ese rol puede mirar.
+   *
+   * El recorte se hace aca y no en el frontend: esconder filas en la pantalla
+   * deja la respuesta completa viajando igual, y cualquiera la lee.
+   */
+  async listar(rolDelActor: Role, rolPedido?: Role) {
+    const roles = filtroDeRoles(rolDelActor, rolPedido);
     const [usuarios, conteo] = await Promise.all([
-      adminUserRepository.listar(rol),
-      adminUserRepository.contarPorRol(),
+      adminUserRepository.listar(roles),
+      adminUserRepository.contarPorRol(filtroDeRoles(rolDelActor)),
     ]);
     return { ...conteo, usuarios };
   },

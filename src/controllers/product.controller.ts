@@ -2,9 +2,9 @@ import type { Request, Response } from "express";
 import { productService } from "@/services/product.service";
 import {
   adjustStockSchema,
-  createProductSchema,
+  crearProductoSchema,
   listProductsQuerySchema,
-  updateProductSchema,
+  actualizarProductoSchema,
 } from "@/schemas/product.schema";
 import { getStockEmitter } from "@/lib/stock-emitter";
 
@@ -21,13 +21,13 @@ export const productController = {
   },
 
   async create(req: Request, res: Response) {
-    const data = createProductSchema.parse(req.body);
+    const data = crearProductoSchema.parse(req.body);
     const product = await productService.create(data);
     res.status(201).json(product);
   },
 
   async update(req: Request, res: Response) {
-    const data = updateProductSchema.parse(req.body);
+    const data = actualizarProductoSchema.parse(req.body);
     const product = await productService.update(req.params.id, data);
     res.json(product);
   },

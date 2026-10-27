@@ -1,4 +1,5 @@
 import { categoryRepository } from "@/repositories/category.repository";
+import { contarConDescendientes } from "@/lib/arbol-categorias";
 import type { CreateCategoryInput, UpdateCategoryInput } from "@/schemas/category.schema";
 import { ApiError } from "@/middlewares/error-handler";
 
@@ -7,8 +8,22 @@ function isUuid(value: string) {
 }
 
 export const categoryService = {
-  listAll() {
-    return categoryRepository.findAll();
+  /**
+   * El listado lleva `productCount`, que incluye a las subcategorias.
+   *
+   * Lo usa el menu del sitio para no ofrecer una categoria vacia: un enlace
+   * a una seccion sin nada es una puerta a un cartel de "no hay productos".
+   */
+  async listAll() {
+    const categorias = await categoryRepository.findAll();
+    const totales = contarConDescendientes(
+      categorias.map((c) => ({ id: c.id, parentId: c.parentId, propios: c._count.products }))
+    );
+
+    return categorias.map(({ _count, ...categoria }) => ({
+      ...categoria,
+      productCount: totales.get(categoria.id) ?? 0,
+    }));
   },
 
   async getByIdOrSlug(idOrSlug: string) {

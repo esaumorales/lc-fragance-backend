@@ -84,10 +84,10 @@ model VerificationCode {
   purpose   CodePurpose @default(LOGIN)
   // Se guarda el hash, igual que los refresh: si se filtra la tabla no sirve.
   codeHash  String
-  attempts  Int       @default(0)
+  attempts  Int         @default(0)
   usedAt    DateTime?
   expiresAt DateTime
-  createdAt DateTime  @default(now())
+  createdAt DateTime    @default(now())
 
   @@index([userId])
 }
@@ -107,13 +107,13 @@ model AccessLink {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  tokenHash String   @unique
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   revokedAt DateTime?
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
@@ -132,26 +132,31 @@ model Category {
 // Modelo genérico: los campos comunes viven en columnas, lo específico
 // de cada rubro (perfumes, tecnología, ...) vive en `attributes` (JSON).
 model Product {
-  id          String   @id @default(uuid())
-  name        String
-  slug        String   @unique
-  description String
-  price       Decimal  @db.Decimal(10, 2)
-  sku         String   @unique
-  stock       Int      @default(0)
-  images      String[] // URLs de Cloudinary
-  model3dUrl  String? // URL Cloudinary del .glb/.gltf, opcional
-  attributes  Json     @default("{}") // ej. perfumes: { mlVolume, notasOlfativas }; tech: { ram, almacenamiento }
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String    @id @default(uuid())
+  name          String
+  slug          String    @unique
+  description   String
+  price         Decimal   @db.Decimal(10, 2)
+  // Oferta: precio rebajado y desde cuando hasta cuando rige. Las fechas son
+  // opcionales por separado; sin ellas la oferta no vence sola.
+  offerPrice    Decimal?  @db.Decimal(10, 2)
+  offerStartsAt DateTime?
+  offerEndsAt   DateTime?
+  sku           String    @unique
+  stock         Int       @default(0)
+  images        String[] // URLs de Cloudinary
+  model3dUrl    String? // URL Cloudinary del .glb/.gltf, opcional
+  attributes    Json      @default("{}") // ej. perfumes: { mlVolume, notasOlfativas }; tech: { ram, almacenamiento }
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
-  cartItems      CartItem[]
-  orderItems     OrderItem[]
-  inventoryLogs  InventoryLog[]
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  inventoryLogs InventoryLog[]
 
   // Indices para el catalogo: el listado siempre filtra por isActive y ordena
   // por createdAt, y los filtros nuevos pegan sobre categoria y precio.
@@ -165,17 +170,17 @@ model Cart {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  items CartItem[]
-  updatedAt DateTime @updatedAt
+  items     CartItem[]
+  updatedAt DateTime   @updatedAt
 }
 
 model CartItem {
-  id       String @id @default(uuid())
-  cartId   String
-  cart     Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId String
-  product  Product @relation(fields: [productId], references: [id])
-  quantity Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
 
   @@unique([cartId, productId])
 }

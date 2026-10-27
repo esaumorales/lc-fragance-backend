@@ -3,7 +3,10 @@ import type { CreateCategoryInput, UpdateCategoryInput } from "@/schemas/categor
 
 export const categoryRepository = {
   findAll() {
-    return prisma.category.findMany({ orderBy: { name: "asc" } });
+    return prisma.category.findMany({
+      orderBy: { name: "asc" },
+      include: { _count: { select: { products: true } } },
+    });
   },
 
   findById(id: string) {
