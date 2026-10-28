@@ -1,186 +1,259 @@
-import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 import { checkoutService } from "@/services/checkout.service";
 import { cartRepository } from "@/repositories/cart.repository";
 import { orderRepository } from "@/repositories/order.repository";
+import { productRepository } from "@/repositories/product.repository";
+import { configuracionPagoRepository } from "@/repositories/configuracion-pago.repository";
 import { adminUserRepository } from "@/repositories/admin-user.repository";
-import { env } from "@/config/env";
-
-// El telefono se fija en cada prueba y no se hereda del .env: si no, el
-// resultado depende de la maquina donde corra.
-const telefonoOriginal = env.checkout.whatsappPhone;
-
-afterEach(() => {
-  vi.restoreAllMocks();
-  env.checkout.whatsappPhone = telefonoOriginal;
-});
-
-// El teléfono del botón sale del perfil de quien atiende. Por defecto nadie
-// cargó el suyo, así que cada prueba cae al número de configuración salvo que
-// diga lo contrario.
-function conContactos(contactos: { role: string; createdAt: Date; phone: string | null }[] = []) {
-  vi.spyOn(adminUserRepository, "contactosDelPanel").mockResolvedValue(
-    contactos.map((c) => ({
-      role: c.role,
-      createdAt: c.createdAt,
-      address: c.phone ? { phone: c.phone } : null,
-    })) as never
-  );
-}
-
-beforeEach(() => {
-  conContactos();
-});
+import { emailService } from "@/services/email.service";
+import type { CheckoutInput } from "@/schemas/checkout.schema";
 
 const userId = "660e8400-e29b-41d4-a716-446655440001";
 const productId = "770e8400-e29b-41d4-a716-446655440002";
 
-function cartWithItems(items: { quantity: number; stock: number; price: number }[]) {
+const PEDIDO: CheckoutInput = {
+  nombre: "Ana Torres",
+  correo: "ana@example.com",
+  celular: "999111222",
+  metodoPago: "YAPE",
+  entrega: "RECOJO",
+};
+
+function configDePago(cambios: Record<string, unknown> = {}) {
+  vi.spyOn(configuracionPagoRepository, "obtener").mockResolvedValue({
+    id: "unica",
+    titular: "Henrry Pérez",
+    yape: "925064242",
+    banco: "BCP",
+    cuenta: "19103537229057",
+    cci: null,
+    correoDeAvisos: "tienda@example.com",
+    recojoActivo: true,
+    deliveryActivo: true,
+    costoDelivery: new Prisma.Decimal(0),
+    updatedAt: new Date(),
+    ...cambios,
+  } as never);
+}
+
+function producto(extra: Record<string, unknown> = {}) {
   return {
-    id: "cart-1",
-    userId,
-    items: items.map((item, i) => ({
-      id: `item-${i}`,
-      productId: `${productId}-${i}`,
-      quantity: item.quantity,
-      product: {
-        id: `${productId}-${i}`,
-        name: `Producto ${i}`,
-        stock: item.stock,
-        price: new Prisma.Decimal(item.price),
-      },
-    })),
+    id: productId,
+    name: "Velvet Musk",
+    stock: 10,
+    price: new Prisma.Decimal(100),
+    offerPrice: null,
+    offerStartsAt: null,
+    offerEndsAt: null,
+    ...extra,
   };
 }
 
-describe("checkoutService.checkout", () => {
-  it("lanza 400 si el carrito está vacío", async () => {
-    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(cartWithItems([]) as never);
+function conCarrito(cantidad = 1, extra: Record<string, unknown> = {}) {
+  vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue({
+    id: "cart-1",
+    userId,
+    items: [{ id: "i1", productId, quantity: cantidad, product: producto(extra) }],
+  } as never);
+}
 
-    await expect(checkoutService.checkout(userId)).rejects.toMatchObject({ status: 400 });
+type DatosCreados = { userId: string | null; total: Prisma.Decimal; costoEnvio: Prisma.Decimal };
+type LineasCreadas = { quantity: number; unitPrice: Prisma.Decimal }[];
+
+const crear = () => vi.mocked(orderRepository.crear);
+
+function loCreado() {
+  const [datos, lineas] = crear().mock.calls[0] as unknown as [DatosCreados, LineasCreadas];
+  return { datos, lineas };
+}
+
+beforeEach(() => {
+  configDePago();
+  vi.spyOn(adminUserRepository, "contactosDelPanel").mockResolvedValue([] as never);
+  vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: true });
+  vi.spyOn(orderRepository, "crear").mockImplementation((async (datos: object) => ({
+    id: "order-1",
+    status: "PENDING",
+    ...datos,
+  })) as never);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("quien compra con cuenta", () => {
+  it("toma los productos de su carrito guardado", async () => {
+    conCarrito(2);
+
+    await checkoutService.checkout(PEDIDO, userId);
+
+    const { datos, lineas } = loCreado();
+    expect(datos.userId).toBe(userId);
+    expect(lineas[0]!.quantity).toBe(2);
   });
 
-  it("lanza 409 si algún producto no tiene stock suficiente", async () => {
-    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(
-      cartWithItems([{ quantity: 5, stock: 2, price: 10 }]) as never
+  it("falla si el carrito está vacío", async () => {
+    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue({
+      id: "cart-1",
+      items: [],
+    } as never);
+
+    await expect(checkoutService.checkout(PEDIDO, userId)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("falla si no alcanza el stock", async () => {
+    conCarrito(99, { stock: 2 });
+
+    await expect(checkoutService.checkout(PEDIDO, userId)).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe("quien compra sin cuenta", () => {
+  beforeEach(() => {
+    vi.spyOn(productRepository, "findByIds").mockResolvedValue([producto()] as never);
+  });
+
+  it("manda los productos en el pedido y queda sin usuario", async () => {
+    await checkoutService.checkout({ ...PEDIDO, items: [{ productId, quantity: 3 }] });
+
+    const { datos, lineas } = loCreado();
+    expect(datos.userId).toBeNull();
+    expect(lineas[0]!.quantity).toBe(3);
+  });
+
+  // El carrito vive en el navegador: si se le creyera el precio, cualquiera
+  // elegiría cuánto paga.
+  it("el precio sale de la base, no de lo que mandó el navegador", async () => {
+    await checkoutService.checkout({ ...PEDIDO, items: [{ productId, quantity: 1 }] });
+
+    expect(loCreado().datos.total.toString()).toBe("100");
+    expect(loCreado().lineas[0]!.unitPrice.toString()).toBe("100");
+  });
+
+  it("falla si el producto ya no está disponible", async () => {
+    vi.spyOn(productRepository, "findByIds").mockResolvedValue([] as never);
+
+    await expect(
+      checkoutService.checkout({ ...PEDIDO, items: [{ productId, quantity: 1 }] })
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("falla si no manda ningún producto", async () => {
+    await expect(checkoutService.checkout(PEDIDO)).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe("cuando la tienda no puede cobrar", () => {
+  beforeEach(() => {
+    configDePago({ yape: null, cuenta: null, cci: null });
+    conCarrito();
+  });
+
+  // Lo que pidió el dueño: si borran los datos de pago, no se deja comprar.
+  it("frena el pedido y explica por qué", async () => {
+    await expect(checkoutService.checkout(PEDIDO, userId)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringMatching(/medios de pago/i),
+    });
+  });
+
+  it("no crea ningún pedido", async () => {
+    await checkoutService.checkout(PEDIDO, userId).catch(() => undefined);
+
+    expect(crear()).not.toHaveBeenCalled();
+  });
+});
+
+describe("la entrega", () => {
+  beforeEach(() => conCarrito());
+
+  // La pantalla no muestra el botón, pero el pedido se puede mandar a mano.
+  it("rechaza delivery si está apagado", async () => {
+    configDePago({ deliveryActivo: false });
+
+    await expect(
+      checkoutService.checkout(
+        { ...PEDIDO, entrega: "DELIVERY", direccion: "Jr. Union 123" },
+        userId
+      )
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("rechaza delivery sin dirección", async () => {
+    await expect(
+      checkoutService.checkout({ ...PEDIDO, entrega: "DELIVERY" }, userId)
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("suma el costo de envío al total", async () => {
+    configDePago({ costoDelivery: new Prisma.Decimal(15) });
+
+    await checkoutService.checkout(
+      { ...PEDIDO, entrega: "DELIVERY", direccion: "Jr. Union 123" },
+      userId
     );
 
-    await expect(checkoutService.checkout(userId)).rejects.toMatchObject({ status: 409 });
+    expect(loCreado().datos.total.toString()).toBe("115");
+    expect(loCreado().datos.costoEnvio.toString()).toBe("15");
   });
 
-  it("crea el pedido pendiente y arma el link de WhatsApp", async () => {
-    env.checkout.whatsappPhone = "51999888777";
-    const cart = cartWithItems([
-      { quantity: 2, stock: 10, price: 25 },
-      { quantity: 1, stock: 5, price: 40 },
-    ]);
-    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(cart as never);
-    vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
-      id: "order-1",
-      status: "PENDING",
-      total: new Prisma.Decimal(90),
-    } as never);
+  it("el recojo no paga envío aunque haya costo cargado", async () => {
+    configDePago({ costoDelivery: new Prisma.Decimal(15) });
 
-    const result = await checkoutService.checkout(userId);
+    await checkoutService.checkout(PEDIDO, userId);
 
-    expect(result.order.id).toBe("order-1");
-    expect(result.order.status).toBe("PENDING");
-    expect(result.whatsappUrl).toContain("wa.me");
-    expect(result.whatsappUrl).toContain(encodeURIComponent("order-1".slice(0, 8)));
+    expect(loCreado().datos.total.toString()).toBe("100");
+  });
+});
+
+describe("el precio que se cobra", () => {
+  // Si la oferta se mostrara pero no se cobrara, el descuento sería mentira.
+  it("usa el precio de oferta cuando está vigente", async () => {
+    conCarrito(2, { offerPrice: new Prisma.Decimal(60) });
+
+    await checkoutService.checkout(PEDIDO, userId);
+
+    expect(loCreado().lineas[0]!.unitPrice.toString()).toBe("60");
+    expect(loCreado().datos.total.toString()).toBe("120");
+  });
+});
+
+describe("el aviso a la tienda", () => {
+  beforeEach(() => conCarrito());
+
+  it("le llega al correo configurado, con el enlace del voucher", async () => {
+    const enviar = vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: true });
+
+    await checkoutService.checkout(
+      { ...PEDIDO, voucherUrl: "https://res.cloudinary.com/demo/voucher.jpg" },
+      userId
+    );
+
+    const mensaje = enviar.mock.calls[0]![0];
+    expect(mensaje.para).toBe("tienda@example.com");
+    expect(mensaje.html).toContain("https://res.cloudinary.com/demo/voucher.jpg");
   });
 
-  // Lo importante del cambio: un carrito abandonado no le quita unidades a
-  // nadie. El stock sale recien cuando el administrador confirma la compra.
-  it("no descuenta stock al hacer checkout", async () => {
-    env.checkout.whatsappPhone = "51999888777";
-    const cart = cartWithItems([{ quantity: 2, stock: 10, price: 25 }]);
-    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(cart as never);
-    const crear = vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
-      id: "order-2",
-      status: "PENDING",
-      total: new Prisma.Decimal(50),
-    } as never);
+  it("sin correo configurado no se manda nada", async () => {
+    configDePago({ correoDeAvisos: null });
+    const enviar = vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: true });
+
+    await checkoutService.checkout(PEDIDO, userId);
+
+    expect(enviar).not.toHaveBeenCalled();
+  });
+});
+
+describe("el stock", () => {
+  // Si saliera en el checkout, cualquiera agotaría el catálogo sin pagar.
+  it("no se descuenta al hacer el pedido", async () => {
+    conCarrito();
     const confirmar = vi.spyOn(orderRepository, "confirmar");
 
-    await checkoutService.checkout(userId);
+    await checkoutService.checkout(PEDIDO, userId);
 
-    expect(crear).toHaveBeenCalledOnce();
     expect(confirmar).not.toHaveBeenCalled();
-  });
-
-  it("deja el link en null si no hay telefono configurado", async () => {
-    env.checkout.whatsappPhone = "";
-    const cart = cartWithItems([{ quantity: 1, stock: 3, price: 10 }]);
-    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(cart as never);
-    vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
-      id: "order-2",
-      status: "PENDING",
-      total: new Prisma.Decimal(10),
-    } as never);
-
-    const result = await checkoutService.checkout(userId);
-
-    expect(result.order.id).toBe("order-2");
-    expect(result.whatsappUrl).toBeNull();
-  });
-
-  // El número ya no sale del .env sino del perfil: así se cambia desde la
-  // pantalla de perfil, sin tocar variables de entorno ni desplegar.
-  it("escribe al teléfono que el administrador puso en su perfil", async () => {
-    env.checkout.whatsappPhone = "51999999999";
-    conContactos([
-      { role: "SUPERADMIN", createdAt: new Date("2026-01-01"), phone: "+51 988 333 444" },
-    ]);
-    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(
-      cartWithItems([{ quantity: 1, stock: 3, price: 10 }]) as never
-    );
-    vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
-      id: "order-3",
-      status: "PENDING",
-      total: new Prisma.Decimal(10),
-    } as never);
-
-    const result = await checkoutService.checkout(userId);
-
-    expect(result.whatsappUrl).toContain("https://wa.me/51988333444");
-  });
-
-  // El mensaje ya no pide comprobante: el pago lo aprueba el administrador.
-  it("no le pide el comprobante a quien compra", async () => {
-    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(
-      cartWithItems([{ quantity: 1, stock: 3, price: 10 }]) as never
-    );
-    vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
-      id: "order-4",
-      status: "PENDING",
-      total: new Prisma.Decimal(10),
-    } as never);
-
-    const result = await checkoutService.checkout(userId);
-
-    expect(decodeURIComponent(result.whatsappUrl ?? "")).not.toMatch(/comprobante/i);
-  });
-
-  // Si la oferta se mostrara pero no se cobrara, el descuento sería mentira.
-  it("cobra el precio de oferta cuando está vigente", async () => {
-    const cart = cartWithItems([{ quantity: 2, stock: 5, price: 100 }]);
-    cart.items[0]!.product = {
-      ...cart.items[0]!.product,
-      offerPrice: new Prisma.Decimal(60),
-      offerStartsAt: null,
-      offerEndsAt: null,
-    } as never;
-    vi.spyOn(cartRepository, "findOrCreateByUserId").mockResolvedValue(cart as never);
-    const crear = vi.spyOn(orderRepository, "createFromCart").mockResolvedValue({
-      id: "order-5",
-      status: "PENDING",
-      total: new Prisma.Decimal(120),
-    } as never);
-
-    await checkoutService.checkout(userId);
-
-    const [, , lineas, total] = crear.mock.calls[0]!;
-    expect(lineas[0]!.unitPrice.toString()).toBe("60");
-    expect(total.toString()).toBe("120");
   });
 });

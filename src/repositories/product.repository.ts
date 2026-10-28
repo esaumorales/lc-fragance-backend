@@ -70,6 +70,12 @@ export const productRepository = {
     return prisma.product.findUnique({ where: { id } });
   },
 
+  // Para el pedido de quien no tiene cuenta: su carrito vive en el navegador
+  // y los precios hay que buscarlos aca, nunca creerle a la peticion.
+  findByIds(ids: string[]) {
+    return prisma.product.findMany({ where: { id: { in: ids }, isActive: true } });
+  },
+
   findBySlug(slug: string) {
     return prisma.product.findUnique({ where: { slug } });
   },

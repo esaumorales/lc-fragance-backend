@@ -13,6 +13,7 @@ import { productRouter } from "@/routes/product.route";
 import { authRouter } from "@/routes/auth.route";
 import { cartRouter } from "@/routes/cart.route";
 import { checkoutRouter } from "@/routes/checkout.route";
+import { configuracionPagoRouter } from "@/routes/configuracion-pago.route";
 import { orderRouter } from "@/routes/order.route";
 import { uploadRouter } from "@/routes/upload.route";
 import { generateOpenApiDocument } from "@/docs/openapi";
@@ -50,6 +51,7 @@ export function createApp() {
   app.use("/api", authRouter);
   app.use("/api", cartRouter);
   app.use("/api", checkoutRouter);
+  app.use("/api", configuracionPagoRouter);
   app.use("/api", orderRouter);
   app.use("/api", uploadRouter);
 

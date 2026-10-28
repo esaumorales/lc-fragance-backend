@@ -24,6 +24,26 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   }
 }
 
+/**
+ * Lee la sesion si viene, y sigue igual si no.
+ *
+ * El checkout lo usan los dos: quien tiene cuenta, para que el pedido quede
+ * atado a ella y se le vacie el carrito guardado; y quien no, que compra sin
+ * registrarse. Un token vencido no corta la compra, simplemente no hay
+ * sesion.
+ */
+export function sesionOpcional(req: Request, _res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return next();
+
+  try {
+    req.user = verifyAccessToken(header.slice("Bearer ".length));
+  } catch {
+    // Sin sesion, pero la compra sigue.
+  }
+  next();
+}
+
 type Rol = AccessTokenPayload["role"];
 
 // El superadministrador puede todo lo que puede un admin: sin esto habria que

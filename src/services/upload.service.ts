@@ -2,8 +2,17 @@ import { createHash } from "crypto";
 import { env } from "@/config/env";
 import { ApiError } from "@/middlewares/error-handler";
 
-// Todas las imagenes del catalogo viven bajo la misma carpeta en Cloudinary.
-const CARPETA = "lc-fragance/productos";
+// Cada cosa en su carpeta: asi el comprobante de alguien no se mezcla con
+// las fotos del catalogo ni se puede pisar una con la otra.
+const CARPETAS = {
+  productos: "lc-fragance/productos",
+  vouchers: "lc-fragance/vouchers",
+} as const;
+
+export type Destino = keyof typeof CARPETAS;
+
+/** 10 MB. El aviso solo aparece cuando alguien lo pasa. */
+export const MAXIMO_DEL_VOUCHER = 10 * 1024 * 1024;
 
 export type FirmaSubida = {
   cloudName: string;
@@ -11,6 +20,9 @@ export type FirmaSubida = {
   timestamp: number;
   folder: string;
   signature: string;
+  /** Lo que el navegador tiene que respetar antes de subir. */
+  maximoBytes: number;
+  formatos: string[];
 };
 
 /**
@@ -20,7 +32,7 @@ export type FirmaSubida = {
  * nunca sale del servidor y los archivos grandes no pasan por el backend.
  */
 export const uploadService = {
-  firmar(): FirmaSubida {
+  firmar(destino: Destino = "productos"): FirmaSubida {
     const { cloudName, apiKey, apiSecret } = env.cloudinary;
 
     if (!cloudName || !apiKey || !apiSecret) {
@@ -31,8 +43,9 @@ export const uploadService = {
 
     // Cloudinary espera los parametros ordenados alfabeticamente y unidos por
     // "&", con el api secret pegado al final antes de hashear.
+    const carpeta = CARPETAS[destino];
     const params: Record<string, string> = {
-      folder: CARPETA,
+      folder: carpeta,
       timestamp: String(timestamp),
     };
     const base = Object.keys(params)
@@ -42,6 +55,14 @@ export const uploadService = {
 
     const signature = createHash("sha1").update(base + apiSecret).digest("hex");
 
-    return { cloudName, apiKey, timestamp, folder: CARPETA, signature };
+    return {
+      cloudName,
+      apiKey,
+      timestamp,
+      folder: carpeta,
+      signature,
+      maximoBytes: MAXIMO_DEL_VOUCHER,
+      formatos: ["jpg", "jpeg", "png", "webp", "heic", "pdf"],
+    };
   },
 };

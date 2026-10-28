@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { orderService } from "@/services/order.service";
+import { Prisma } from "@prisma/client";
 import { orderRepository } from "@/repositories/order.repository";
+import { emailService } from "@/services/email.service";
 import { puedeAvanzarA, puedeCancelar, puedeConfirmar, yaDescontoStock } from "@/lib/reglas-pedido";
 
 afterEach(() => {
@@ -13,6 +15,11 @@ function pedido(status: "PENDING" | "PAID" | "CANCELLED", stock = 10, cantidad =
   return {
     id: pedidoId,
     status,
+    // Los datos de contacto viven en el pedido: tambien compra quien no tiene
+    // cuenta, y el aviso sale de aca.
+    nombre: "Ana Torres",
+    correo: "ana@example.com",
+    total: new Prisma.Decimal(200),
     items: [
       {
         productId: "prod-1",
@@ -69,15 +76,17 @@ describe("reglas de pedido", () => {
   });
 });
 
+const PLAZO = "En 2 o 3 días";
+
 describe("orderService.confirmar", () => {
   it("descuenta el stock y avisa por socket el valor nuevo", async () => {
     vi.spyOn(orderRepository, "findById").mockResolvedValue(pedido("PENDING", 10, 2) as never);
     const descontar = vi.spyOn(orderRepository, "confirmar").mockResolvedValue({} as never);
     const emit = vi.fn();
 
-    await orderService.confirmar(pedidoId, emit);
+    await orderService.confirmar(pedidoId, PLAZO, emit);
 
-    expect(descontar).toHaveBeenCalledWith(pedidoId, [{ productId: "prod-1", quantity: 2 }]);
+    expect(descontar).toHaveBeenCalledWith(pedidoId, [{ productId: "prod-1", quantity: 2 }], PLAZO);
     expect(emit).toHaveBeenCalledWith({ productId: "prod-1", stock: 8 });
   });
 
@@ -85,14 +94,14 @@ describe("orderService.confirmar", () => {
     vi.spyOn(orderRepository, "findById").mockResolvedValue(pedido("PENDING", 1, 5) as never);
     const descontar = vi.spyOn(orderRepository, "confirmar");
 
-    await expect(orderService.confirmar(pedidoId)).rejects.toMatchObject({ status: 409 });
+    await expect(orderService.confirmar(pedidoId, PLAZO)).rejects.toMatchObject({ status: 409 });
     expect(descontar).not.toHaveBeenCalled();
   });
 
   it("rechaza con 404 si el pedido no existe", async () => {
     vi.spyOn(orderRepository, "findById").mockResolvedValue(null);
 
-    await expect(orderService.confirmar(pedidoId)).rejects.toMatchObject({ status: 404 });
+    await expect(orderService.confirmar(pedidoId, PLAZO)).rejects.toMatchObject({ status: 404 });
   });
 });
 
@@ -124,5 +133,32 @@ describe("orderService.cancelar", () => {
     vi.spyOn(orderRepository, "findById").mockResolvedValue(pedido("CANCELLED") as never);
 
     await expect(orderService.cancelar(pedidoId)).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe("el aviso a quien compró", () => {
+  // Lo que el admin promete al aceptar tiene que llegarle a la persona.
+  it("le manda el plazo al correo del pedido", async () => {
+    vi.spyOn(orderRepository, "findById").mockResolvedValue(pedido("PENDING", 10, 2) as never);
+    vi.spyOn(orderRepository, "confirmar").mockResolvedValue({} as never);
+    const enviar = vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: true });
+
+    await orderService.confirmar(pedidoId, PLAZO);
+
+    const mensaje = enviar.mock.calls[0]![0];
+    expect(mensaje.para).toBe("ana@example.com");
+    expect(mensaje.html).toContain(PLAZO);
+  });
+
+  // El stock ya salió y el pedido ya está aceptado: un correo caído no puede
+  // deshacer eso.
+  it("si el correo falla, el pedido queda aceptado igual", async () => {
+    vi.spyOn(orderRepository, "findById").mockResolvedValue(pedido("PENDING", 10, 2) as never);
+    const descontar = vi.spyOn(orderRepository, "confirmar").mockResolvedValue({} as never);
+    vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: false, motivo: "sin red" });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await expect(orderService.confirmar(pedidoId, PLAZO)).resolves.toBeDefined();
+    expect(descontar).toHaveBeenCalled();
   });
 });

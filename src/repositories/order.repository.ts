@@ -17,19 +17,20 @@ export const orderRepository = {
    * compra ocurrio: si saliera aca, cualquiera podria agotar el catalogo
    * haciendo checkout y no pagando nunca.
    */
-  async createFromCart(
-    userId: string,
-    cartId: string,
+  async crear(
+    datos: Prisma.OrderUncheckedCreateInput,
     items: { productId: string; quantity: number; unitPrice: Prisma.Decimal }[],
-    total: Prisma.Decimal
+    // Sin carrito cuando el pedido es de alguien sin cuenta: ahi los
+    // productos llegan en la peticion y no hay nada que vaciar despues.
+    cartId?: string
   ) {
     return prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
-        data: { userId, total, items: { create: items } },
+        data: { ...datos, items: { create: items } },
         include: { items: true },
       });
 
-      await tx.cartItem.deleteMany({ where: { cartId } });
+      if (cartId) await tx.cartItem.deleteMany({ where: { cartId } });
 
       return order;
     });
@@ -57,7 +58,7 @@ export const orderRepository = {
   },
 
   // Confirmar descuenta el stock y deja constancia: todo o nada.
-  async confirmar(id: string, items: { productId: string; quantity: number }[]) {
+  async confirmar(id: string, items: { productId: string; quantity: number }[], plazo: string) {
     return prisma.$transaction(async (tx) => {
       for (const item of items) {
         await tx.product.update({
@@ -69,7 +70,11 @@ export const orderRepository = {
         });
       }
 
-      return tx.order.update({ where: { id }, data: { status: "PAID" }, include: CON_DETALLE });
+      return tx.order.update({
+        where: { id },
+        data: { status: "PAID", plazo, aceptadoEn: new Date() },
+        include: CON_DETALLE,
+      });
     });
   },
 

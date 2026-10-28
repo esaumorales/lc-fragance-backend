@@ -108,7 +108,99 @@ function boton(texto: string, enlace: string): string {
   </p>`;
 }
 
+
+// Fila de una tabla de datos: etiqueta a la izquierda, valor a la derecha.
+function dato(etiqueta: string, valor: string): string {
+  return `<tr>
+    <td style="padding:7px 0;font-size:12px;color:${SUAVE};white-space:nowrap;">${escapar(etiqueta)}</td>
+    <td style="padding:7px 0 7px 18px;font-size:13px;color:${TEXTO};text-align:right;">${valor}</td>
+  </tr>`;
+}
+
+type RenglonDeProducto = { name: string; quantity: number; unitPrice: string };
+
+function tablaDeProductos(items: readonly RenglonDeProducto[], total: string): string {
+  const filas = items
+    .map(
+      (item) => `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid ${LINEA};font-size:13px;color:${TEXTO};">
+          ${escapar(item.name)}${item.quantity > 1 ? ` <span style="color:${SUAVE};">x${item.quantity}</span>` : ""}
+        </td>
+        <td style="padding:8px 0;border-bottom:1px solid ${LINEA};font-size:13px;color:${TEXTO};text-align:right;white-space:nowrap;">
+          S/ ${escapar(item.unitPrice)}
+        </td>
+      </tr>`
+    )
+    .join("");
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 0;">
+    ${filas}
+    <tr>
+      <td style="padding:12px 0 0;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:${SUAVE};">Total</td>
+      <td style="padding:12px 0 0;font-family:Georgia,serif;font-size:19px;color:${ORO};text-align:right;">S/ ${escapar(total)}</td>
+    </tr>
+  </table>`;
+}
+
+export type PedidoParaCorreo = {
+  orderId: string;
+  nombre: string;
+  correo: string;
+  celular: string;
+  metodoPago: "YAPE" | "TRANSFERENCIA";
+  entrega: "RECOJO" | "DELIVERY";
+  direccion: string | null;
+  nota: string | null;
+  voucherUrl: string | null;
+  items: readonly RenglonDeProducto[];
+  total: string;
+};
+
+const COMO_PAGA = { YAPE: "Yape", TRANSFERENCIA: "Transferencia" };
+const COMO_RECIBE = { RECOJO: "Recojo en tienda", DELIVERY: "Delivery" };
+
 export const plantillas = {
+
+  /** Para la tienda, cuando entra un pedido. */
+  pedidoNuevo(pedido: PedidoParaCorreo): string {
+    const contacto =
+      dato("Nombre", escapar(pedido.nombre)) +
+      dato("Celular", `<a href="https://wa.me/${escapar(pedido.celular.replace(/\D/g, ""))}" style="color:${ORO};text-decoration:none;">${escapar(pedido.celular)}</a>`) +
+      dato("Correo", `<a href="mailto:${escapar(pedido.correo)}" style="color:${ORO};text-decoration:none;">${escapar(pedido.correo)}</a>`) +
+      dato("Pago", escapar(COMO_PAGA[pedido.metodoPago])) +
+      dato("Entrega", escapar(COMO_RECIBE[pedido.entrega])) +
+      (pedido.direccion ? dato("Dirección", escapar(pedido.direccion)) : "") +
+      (pedido.nota ? dato("Nota", escapar(pedido.nota)) : "");
+
+    return envoltura(
+      `Pedido nuevo de ${pedido.nombre} por S/ ${pedido.total}`,
+      encabezado("Pedido nuevo") +
+        parrafo(`Entró el pedido <strong style="color:${TEXTO};">#${escapar(pedido.orderId.slice(0, 8))}</strong>. Queda pendiente hasta que lo aceptes desde el panel.`) +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${contacto}</table>` +
+        tablaDeProductos(pedido.items, pedido.total) +
+        (pedido.voucherUrl
+          ? boton("Ver el comprobante", pedido.voucherUrl)
+          : nota("No adjuntó comprobante.")) +
+        nota("El stock se descuenta recién cuando aceptás el pedido.")
+    );
+  },
+
+  /** Para quien compro, cuando el admin acepta. */
+  pedidoAceptado(nombre: string, orderId: string, plazo: string, total: string): string {
+    return envoltura(
+      "Tu pedido fue aceptado",
+      encabezado("Tu pedido fue aceptado") +
+        parrafo(`Hola <strong style="color:${TEXTO};">${escapar(nombre)}</strong>, confirmamos tu pago y ya estamos preparando el pedido <strong style="color:${TEXTO};">#${escapar(orderId.slice(0, 8))}</strong>.`) +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 4px;">
+          <tr><td align="center" style="background:${FONDO};border:1px solid ${ORO};border-radius:10px;padding:20px 16px;">
+            <p style="margin:0;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:${SUAVE};">Lo recibís</p>
+            <p style="margin:8px 0 0;font-family:Georgia,serif;font-size:23px;color:${ORO};">${escapar(plazo)}</p>
+          </td></tr>
+        </table>` +
+        nota(`Total del pedido: S/ ${escapar(total)}.`) +
+        nota("Cualquier cosa, respondé este correo o escribinos por WhatsApp.")
+    );
+  },
   codigoDeAcceso(nombre: string, codigo: string, minutos: number): string {
     return envoltura(
       `Tu código de acceso es ${codigo}`,

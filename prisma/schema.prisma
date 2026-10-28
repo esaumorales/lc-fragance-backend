@@ -186,15 +186,70 @@ model CartItem {
 }
 
 model Order {
-  id        String      @id @default(uuid())
-  userId    String
-  user      User        @relation(fields: [userId], references: [id])
-  status    OrderStatus @default(PENDING)
-  total     Decimal     @db.Decimal(10, 2)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id String @id @default(uuid())
+
+  // Opcional: tambien compra quien no quiso crearse una cuenta. Los datos de
+  // contacto van igual en el pedido, con cuenta o sin ella, porque son los de
+  // esta compra y no los del perfil, que puede cambiar despues.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  nombre  String
+  correo  String
+  celular String
+
+  status OrderStatus @default(PENDING)
+  total  Decimal     @db.Decimal(10, 2)
+
+  entrega    TipoDeEntrega @default(RECOJO)
+  direccion  String?
+  costoEnvio Decimal       @default(0) @db.Decimal(10, 2)
+  nota       String?
+
+  metodoPago MetodoDePago
+  // URL del comprobante en Cloudinary. Lo mira el admin antes de aceptar.
+  voucherUrl String?
+
+  // Lo que el admin promete al aceptar: "entre 2 y 3 dias". Texto libre
+  // porque el plazo real depende del pedido y de la agenda de la tienda.
+  plazo      String?
+  aceptadoEn DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   items OrderItem[]
+}
+
+enum TipoDeEntrega {
+  RECOJO
+  DELIVERY
+}
+
+enum MetodoDePago {
+  YAPE
+  TRANSFERENCIA
+}
+
+// Los datos de cobro de la tienda. Hay una sola fila: no son de cada admin,
+// son del negocio, y cualquier admin la edita.
+model ConfiguracionDePago {
+  id String @id @default("unica")
+
+  titular String?
+  yape    String?
+  banco   String?
+  cuenta  String?
+  cci     String?
+
+  // A donde llega el aviso de cada pedido nuevo. Una sola casilla.
+  correoDeAvisos String?
+
+  recojoActivo   Boolean @default(true)
+  deliveryActivo Boolean @default(true)
+  costoDelivery  Decimal @default(0) @db.Decimal(10, 2)
+
+  updatedAt DateTime @updatedAt
 }
 
 model OrderItem {

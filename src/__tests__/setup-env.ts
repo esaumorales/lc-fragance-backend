@@ -13,3 +13,8 @@ const valoresDePrueba: Record<string, string> = {
 for (const [clave, valor] of Object.entries(valoresDePrueba)) {
   process.env[clave] = valor;
 }
+
+// Sin clave de Resend, emailService corta antes de salir a la red. Con la del
+// .env puesta, una prueba que se olvide de simular el envio le manda un
+// correo de verdad a Resend: lento, inestable y ademas se manda.
+delete process.env.RESEND_API_KEY;

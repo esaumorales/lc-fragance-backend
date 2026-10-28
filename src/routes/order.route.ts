@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { confirmarPedidoSchema } from "@/schemas/order.schema";
 import { z } from "zod";
 import { orderService } from "@/services/order.service";
 import { asyncHandler } from "@/middlewares/async-handler";
@@ -35,7 +36,8 @@ orderRouter.post(
   "/admin/pedidos/:id/confirmar",
   soloAdmin,
   asyncHandler(async (req, res) => {
-    res.json(await orderService.confirmar(req.params.id, getStockEmitter(req)));
+    const { plazo } = confirmarPedidoSchema.parse(req.body);
+    res.json(await orderService.confirmar(req.params.id, plazo, getStockEmitter(req)));
   })
 );
 
