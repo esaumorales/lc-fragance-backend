@@ -147,6 +147,7 @@ export type PedidoParaCorreo = {
   nombre: string;
   correo: string;
   celular: string;
+  dni: string;
   metodoPago: "YAPE" | "TRANSFERENCIA";
   entrega: "RECOJO" | "DELIVERY";
   direccion: string | null;
@@ -167,6 +168,7 @@ export const plantillas = {
       dato("Nombre", escapar(pedido.nombre)) +
       dato("Celular", `<a href="https://wa.me/${escapar(pedido.celular.replace(/\D/g, ""))}" style="color:${ORO};text-decoration:none;">${escapar(pedido.celular)}</a>`) +
       dato("Correo", `<a href="mailto:${escapar(pedido.correo)}" style="color:${ORO};text-decoration:none;">${escapar(pedido.correo)}</a>`) +
+      dato("Documento", escapar(pedido.dni)) +
       dato("Pago", escapar(COMO_PAGA[pedido.metodoPago])) +
       dato("Entrega", escapar(COMO_RECIBE[pedido.entrega])) +
       (pedido.direccion ? dato("Dirección", escapar(pedido.direccion)) : "") +

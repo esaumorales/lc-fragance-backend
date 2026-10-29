@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCategorySchema } from "@/schemas/category.schema";
+import { checkoutSchema } from "@/schemas/checkout.schema";
 import {
   actualizarProductoSchema,
   adjustStockSchema,
@@ -110,5 +111,36 @@ describe("ofertas en el producto", () => {
   it("al editar, sacar la oferta es mandar el precio en null", () => {
     const resultado = actualizarProductoSchema.safeParse({ offerPrice: null });
     expect(resultado.success).toBe(true);
+  });
+});
+
+describe("el documento en el pedido", () => {
+  const base = {
+    nombre: "Ana Torres",
+    correo: "ana@gmail.com",
+    celular: "999111222",
+    metodoPago: "YAPE" as const,
+    entrega: "RECOJO" as const,
+  };
+
+  it("acepta un DNI peruano", () => {
+    expect(checkoutSchema.safeParse({ ...base, dni: "70123456" }).success).toBe(true);
+  });
+
+  // Exigir ocho dígitos dejaría afuera a quien tiene carnet de extranjería.
+  it("acepta un carnet de extranjería con letras", () => {
+    expect(checkoutSchema.safeParse({ ...base, dni: "CE1234567" }).success).toBe(true);
+  });
+
+  it("rechaza uno demasiado corto", () => {
+    expect(checkoutSchema.safeParse({ ...base, dni: "123" }).success).toBe(false);
+  });
+
+  it("rechaza uno con puntos o guiones", () => {
+    expect(checkoutSchema.safeParse({ ...base, dni: "70.123.456" }).success).toBe(false);
+  });
+
+  it("no deja hacer el pedido sin documento", () => {
+    expect(checkoutSchema.safeParse(base).success).toBe(false);
   });
 });

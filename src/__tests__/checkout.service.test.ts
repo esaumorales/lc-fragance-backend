@@ -16,6 +16,7 @@ const PEDIDO: CheckoutInput = {
   nombre: "Ana Torres",
   correo: "ana@example.com",
   celular: "999111222",
+  dni: "70123456",
   metodoPago: "YAPE",
   entrega: "RECOJO",
 };
@@ -255,5 +256,24 @@ describe("el stock", () => {
     await checkoutService.checkout(PEDIDO, userId);
 
     expect(confirmar).not.toHaveBeenCalled();
+  });
+});
+
+describe("el documento", () => {
+  beforeEach(() => conCarrito());
+
+  // Lo pide el courier para entregar y va en la nota de venta.
+  it("queda guardado en el pedido", async () => {
+    await checkoutService.checkout(PEDIDO, userId);
+
+    expect((loCreado().datos as unknown as { dni: string }).dni).toBe("70123456");
+  });
+
+  it("le llega a la tienda en el aviso", async () => {
+    const enviar = vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: true });
+
+    await checkoutService.checkout(PEDIDO, userId);
+
+    expect(enviar.mock.calls[0]![0].html).toContain("70123456");
   });
 });
