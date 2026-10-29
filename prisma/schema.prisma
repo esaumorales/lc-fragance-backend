@@ -197,8 +197,10 @@ model Order {
   nombre  String
   correo  String
   celular String
-  // Lo pide el courier para entregar, y va en la nota de venta.
-  dni     String
+  // Lo pide el courier para entregar, y va en la nota de venta. Opcional
+  // porque los pedidos anteriores a este campo no lo tienen: ponerles una
+  // cadena vacia seria inventarles un documento.
+  dni     String?
 
   status OrderStatus @default(PENDING)
   total  Decimal     @db.Decimal(10, 2)

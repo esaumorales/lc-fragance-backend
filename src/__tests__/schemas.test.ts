@@ -144,3 +144,19 @@ describe("el documento en el pedido", () => {
     expect(checkoutSchema.safeParse(base).success).toBe(false);
   });
 });
+
+// La columna admite null para los pedidos viejos, pero el checkout lo exige
+// para los nuevos: el courier no puede entregar sin documento.
+describe("el documento sigue siendo obligatorio al pedir", () => {
+  it("un pedido nuevo sin documento se rechaza", () => {
+    const sinDni = {
+      nombre: "Ana Torres",
+      correo: "ana@gmail.com",
+      celular: "999111222",
+      metodoPago: "YAPE" as const,
+      entrega: "RECOJO" as const,
+    };
+
+    expect(checkoutSchema.safeParse(sinDni).success).toBe(false);
+  });
+});
