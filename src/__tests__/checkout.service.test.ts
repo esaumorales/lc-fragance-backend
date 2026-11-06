@@ -5,8 +5,8 @@ import { cartRepository } from "@/repositories/cart.repository";
 import { orderRepository } from "@/repositories/order.repository";
 import { productRepository } from "@/repositories/product.repository";
 import { configuracionPagoRepository } from "@/repositories/configuracion-pago.repository";
-import { adminUserRepository } from "@/repositories/admin-user.repository";
 import { emailService } from "@/services/email.service";
+import { env } from "@/config/env";
 import type { CheckoutInput } from "@/schemas/checkout.schema";
 
 const userId = "660e8400-e29b-41d4-a716-446655440001";
@@ -30,6 +30,7 @@ function configDePago(cambios: Record<string, unknown> = {}) {
     cuenta: "19103537229057",
     cci: null,
     correoDeAvisos: "tienda@example.com",
+    whatsapp: "+51 974 732 528",
     recojoActivo: true,
     deliveryActivo: true,
     costoDelivery: new Prisma.Decimal(0),
@@ -71,7 +72,6 @@ function loCreado() {
 
 beforeEach(() => {
   configDePago();
-  vi.spyOn(adminUserRepository, "contactosDelPanel").mockResolvedValue([] as never);
   vi.spyOn(emailService, "enviar").mockResolvedValue({ enviado: true });
   vi.spyOn(orderRepository, "crear").mockImplementation((async (datos: object) => ({
     id: "order-1",
@@ -275,5 +275,38 @@ describe("el documento", () => {
     await checkoutService.checkout(PEDIDO, userId);
 
     expect(enviar.mock.calls[0]![0].html).toContain("70123456");
+  });
+});
+
+describe("el botón de WhatsApp", () => {
+  beforeEach(() => conCarrito());
+
+  // El numero es de la tienda y se carga en el panel, no sale del perfil de
+  // ningun admin: si saliera de ahi, cambiaria solo cuando esa persona edita
+  // su telefono.
+  it("escribe al número cargado en la configuración", async () => {
+    const { whatsappUrl } = await checkoutService.checkout(PEDIDO, userId);
+
+    expect(whatsappUrl).toContain("https://wa.me/51974732528");
+  });
+
+  it("limpia el formato antes de armar el enlace", async () => {
+    configDePago({ whatsapp: "(051) 974 732-528" });
+
+    const { whatsappUrl } = await checkoutService.checkout(PEDIDO, userId);
+
+    expect(whatsappUrl).toContain("wa.me/051974732528");
+  });
+
+  // Mejor sin boton que mandar a alguien a un numero que no existe.
+  it("sin número cargado no hay botón", async () => {
+    configDePago({ whatsapp: null });
+    const original = env.checkout.whatsappPhone;
+    env.checkout.whatsappPhone = "";
+
+    const { whatsappUrl } = await checkoutService.checkout(PEDIDO, userId);
+
+    expect(whatsappUrl).toBeNull();
+    env.checkout.whatsappPhone = original;
   });
 });

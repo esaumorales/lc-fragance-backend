@@ -3,11 +3,10 @@ import { cartRepository } from "@/repositories/cart.repository";
 import { orderRepository } from "@/repositories/order.repository";
 import { productRepository } from "@/repositories/product.repository";
 import { configuracionPagoRepository } from "@/repositories/configuracion-pago.repository";
-import { adminUserRepository } from "@/repositories/admin-user.repository";
 import { ApiError } from "@/middlewares/error-handler";
 import { env } from "@/config/env";
 import { precioVigente } from "@/lib/precio-vigente";
-import { telefonoDeContacto } from "@/lib/telefono-de-contacto";
+import { normalizarTelefono } from "@/lib/telefono";
 import { mensajeDePedido } from "@/lib/mensaje-de-pedido";
 import { costoDeEnvio, revisarPedido } from "@/lib/validar-pedido";
 import { motivoParaNoVender } from "@/lib/reglas-de-pago";
@@ -71,23 +70,6 @@ async function armarLineas(entrada: CheckoutInput, userId?: string) {
   return { lineas, cartId: undefined };
 }
 
-/**
- * El numero al que escribe quien compra.
- *
- * Sale del perfil de quien atiende y no de la configuracion: asi se cambia
- * desde la pantalla de perfil, sin tocar variables de entorno ni desplegar.
- */
-async function telefonoParaCoordinar(): Promise<string | null> {
-  const contactos = await adminUserRepository.contactosDelPanel();
-  return telefonoDeContacto(
-    contactos.map((contacto) => ({
-      role: contacto.role as "ADMIN" | "SUPERADMIN",
-      createdAt: contacto.createdAt,
-      telefono: contacto.address?.phone ?? null,
-    })),
-    env.checkout.whatsappPhone || null
-  );
-}
 
 /** Aviso a la tienda. No se espera que corte el pedido si falla. */
 async function avisarALaTienda(
@@ -166,7 +148,10 @@ export const checkoutService = {
 
     await avisarALaTienda(config.correoDeAvisos, order.id, entrada, lineas, total);
 
-    const telefono = await telefonoParaCoordinar();
+    // El numero de atencion es de la tienda y se carga en el panel. Sin uno
+    // cargado no hay boton: mejor eso que mandar a alguien a un numero que
+    // no existe.
+    const telefono = normalizarTelefono(config.whatsapp) ?? normalizarTelefono(env.checkout.whatsappPhone);
     const mensaje = mensajeDePedido(order.id, lineas, total);
 
     return {

@@ -18,6 +18,7 @@ export const guardarConfiguracionPagoSchema = z
     banco: texto(60),
     cuenta: texto(40),
     cci: texto(40),
+    whatsapp: texto(20),
     correoDeAvisos: z
       .string()
       .trim()

@@ -55,15 +55,6 @@ export const adminUserRepository = {
     return { total: Object.values(conteo).reduce((a, b) => a + b, 0), porRol: conteo };
   },
 
-  // Para el boton de WhatsApp del carrito: quien atiende y con que numero.
-  contactosDelPanel() {
-    return prisma.user.findMany({
-      where: { role: { in: ["ADMIN", "SUPERADMIN"] }, isActive: true },
-      select: { role: true, createdAt: true, address: { select: { phone: true } } },
-      orderBy: { createdAt: "asc" },
-    });
-  },
-
   buscarPorId(id: string) {
     return prisma.user.findUnique({ where: { id }, select: CON_DIRECCION });
   },
